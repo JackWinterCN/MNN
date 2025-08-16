@@ -10,6 +10,8 @@ add_executable(concat_dynamic_shape_test.out ${CMAKE_CURRENT_LIST_DIR}/concat_dy
 list(APPEND MNN_EXEC_DEMOS concat_dynamic_shape_test.out)
 add_executable(yolov5s.out ${CMAKE_CURRENT_LIST_DIR}/yolov5s.cpp)
 list(APPEND MNN_EXEC_DEMOS yolov5s.out)
+add_executable(module_test.out ${CMAKE_CURRENT_LIST_DIR}/module_test.cpp)
+list(APPEND MNN_EXEC_DEMOS module_test.out)
 
 add_executable(pictureRecognition_module.out ${CMAKE_CURRENT_LIST_DIR}/pictureRecognition_module.cpp)
 list(APPEND MNN_EXEC_DEMOS pictureRecognition_module.out)
