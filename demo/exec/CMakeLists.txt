@@ -14,6 +14,8 @@ add_executable(module_test.out ${CMAKE_CURRENT_LIST_DIR}/module_test.cpp)
 list(APPEND MNN_EXEC_DEMOS module_test.out)
 add_executable(opencl_test.out ${CMAKE_CURRENT_LIST_DIR}/opencl_test.cpp)
 list(APPEND MNN_EXEC_DEMOS opencl_test.out)
+add_executable(xpu_test.out ${CMAKE_CURRENT_LIST_DIR}/xpu_test.cpp)
+list(APPEND MNN_EXEC_DEMOS xpu_test.out)
 
 add_executable(pictureRecognition_module.out ${CMAKE_CURRENT_LIST_DIR}/pictureRecognition_module.cpp)
 list(APPEND MNN_EXEC_DEMOS pictureRecognition_module.out)

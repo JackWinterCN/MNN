@@ -127,6 +127,9 @@ struct TensorArrayT;
 struct LSTMBlockCell;
 struct LSTMBlockCellT;
 
+struct MyCustomOpParam;
+struct MyCustomOpParamT;
+
 inline const flatbuffers::TypeTable *BinaryOpTypeTable();
 
 inline const flatbuffers::TypeTable *PackParamTypeTable();
@@ -204,6 +207,8 @@ inline const flatbuffers::TypeTable *RandomUniformTypeTable();
 inline const flatbuffers::TypeTable *TensorArrayTypeTable();
 
 inline const flatbuffers::TypeTable *LSTMBlockCellTypeTable();
+
+inline const flatbuffers::TypeTable *MyCustomOpParamTypeTable();
 
 enum BinaryOpOperation {
   BinaryOpOperation_ADD = 0,
@@ -588,6 +593,42 @@ inline const char *EnumNamePadValueMode(PadValueMode e) {
   if (e < PadValueMode_CONSTANT || e > PadValueMode_EDGE) return "";
   const size_t index = static_cast<int>(e);
   return EnumNamesPadValueMode()[index];
+}
+
+enum MyCustomOpType {
+  MyCustomOpType_M_ADD = 0,
+  MyCustomOpType_M_SUB = 1,
+  MyCustomOpType_M_MUL = 2,
+  MyCustomOpType_M_DIV = 3,
+  MyCustomOpType_MIN = MyCustomOpType_M_ADD,
+  MyCustomOpType_MAX = MyCustomOpType_M_DIV
+};
+
+inline const MyCustomOpType (&EnumValuesMyCustomOpType())[4] {
+  static const MyCustomOpType values[] = {
+    MyCustomOpType_M_ADD,
+    MyCustomOpType_M_SUB,
+    MyCustomOpType_M_MUL,
+    MyCustomOpType_M_DIV
+  };
+  return values;
+}
+
+inline const char * const *EnumNamesMyCustomOpType() {
+  static const char * const names[] = {
+    "M_ADD",
+    "M_SUB",
+    "M_MUL",
+    "M_DIV",
+    nullptr
+  };
+  return names;
+}
+
+inline const char *EnumNameMyCustomOpType(MyCustomOpType e) {
+  if (e < MyCustomOpType_M_ADD || e > MyCustomOpType_M_DIV) return "";
+  const size_t index = static_cast<int>(e);
+  return EnumNamesMyCustomOpType()[index];
 }
 
 struct BinaryOpT : public flatbuffers::NativeTable {
@@ -3653,6 +3694,82 @@ inline flatbuffers::Offset<LSTMBlockCell> CreateLSTMBlockCell(
 
 flatbuffers::Offset<LSTMBlockCell> CreateLSTMBlockCell(flatbuffers::FlatBufferBuilder &_fbb, const LSTMBlockCellT *_o, const flatbuffers::rehasher_function_t *_rehasher = nullptr);
 
+struct MyCustomOpParamT : public flatbuffers::NativeTable {
+  typedef MyCustomOpParam TableType;
+  MyCustomOpType opType;
+  int32_t offset;
+  DataType dataType;
+  MyCustomOpParamT()
+      : opType(MyCustomOpType_M_ADD),
+        offset(0),
+        dataType(DataType_DT_FLOAT) {
+  }
+};
+
+struct MyCustomOpParam FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
+  typedef MyCustomOpParamT NativeTableType;
+  static const flatbuffers::TypeTable *MiniReflectTypeTable() {
+    return MyCustomOpParamTypeTable();
+  }
+  MyCustomOpType opType() const {
+    return static_cast<MyCustomOpType>(GetField<int32_t>(4, 0));
+  }
+  int32_t offset() const {
+    return GetField<int32_t>(6, 0);
+  }
+  DataType dataType() const {
+    return static_cast<DataType>(GetField<int32_t>(8, 1));
+  }
+  bool Verify(flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<int32_t>(verifier, 4) &&
+           VerifyField<int32_t>(verifier, 6) &&
+           VerifyField<int32_t>(verifier, 8) &&
+           verifier.EndTable();
+  }
+  MyCustomOpParamT *UnPack(const flatbuffers::resolver_function_t *_resolver = nullptr) const;
+  void UnPackTo(MyCustomOpParamT *_o, const flatbuffers::resolver_function_t *_resolver = nullptr) const;
+  static flatbuffers::Offset<MyCustomOpParam> Pack(flatbuffers::FlatBufferBuilder &_fbb, const MyCustomOpParamT* _o, const flatbuffers::rehasher_function_t *_rehasher = nullptr);
+};
+
+struct MyCustomOpParamBuilder {
+  flatbuffers::FlatBufferBuilder &fbb_;
+  flatbuffers::uoffset_t start_;
+  void add_opType(MyCustomOpType opType) {
+    fbb_.AddElement<int32_t>(4, static_cast<int32_t>(opType), 0);
+  }
+  void add_offset(int32_t offset) {
+    fbb_.AddElement<int32_t>(6, offset, 0);
+  }
+  void add_dataType(DataType dataType) {
+    fbb_.AddElement<int32_t>(8, static_cast<int32_t>(dataType), 1);
+  }
+  explicit MyCustomOpParamBuilder(flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  MyCustomOpParamBuilder &operator=(const MyCustomOpParamBuilder &);
+  flatbuffers::Offset<MyCustomOpParam> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = flatbuffers::Offset<MyCustomOpParam>(end);
+    return o;
+  }
+};
+
+inline flatbuffers::Offset<MyCustomOpParam> CreateMyCustomOpParam(
+    flatbuffers::FlatBufferBuilder &_fbb,
+    MyCustomOpType opType = MyCustomOpType_M_ADD,
+    int32_t offset = 0,
+    DataType dataType = DataType_DT_FLOAT) {
+  MyCustomOpParamBuilder builder_(_fbb);
+  builder_.add_dataType(dataType);
+  builder_.add_offset(offset);
+  builder_.add_opType(opType);
+  return builder_.Finish();
+}
+
+flatbuffers::Offset<MyCustomOpParam> CreateMyCustomOpParam(flatbuffers::FlatBufferBuilder &_fbb, const MyCustomOpParamT *_o, const flatbuffers::rehasher_function_t *_rehasher = nullptr);
+
 inline BinaryOpT *BinaryOp::UnPack(const flatbuffers::resolver_function_t *_resolver) const {
   auto _o = new BinaryOpT();
   UnPackTo(_o, _resolver);
@@ -4928,6 +5045,38 @@ inline flatbuffers::Offset<LSTMBlockCell> CreateLSTMBlockCell(flatbuffers::FlatB
       _use_peephole);
 }
 
+inline MyCustomOpParamT *MyCustomOpParam::UnPack(const flatbuffers::resolver_function_t *_resolver) const {
+  auto _o = new MyCustomOpParamT();
+  UnPackTo(_o, _resolver);
+  return _o;
+}
+
+inline void MyCustomOpParam::UnPackTo(MyCustomOpParamT *_o, const flatbuffers::resolver_function_t *_resolver) const {
+  (void)_o;
+  (void)_resolver;
+  { auto _e = opType(); _o->opType = _e; };
+  { auto _e = offset(); _o->offset = _e; };
+  { auto _e = dataType(); _o->dataType = _e; };
+}
+
+inline flatbuffers::Offset<MyCustomOpParam> MyCustomOpParam::Pack(flatbuffers::FlatBufferBuilder &_fbb, const MyCustomOpParamT* _o, const flatbuffers::rehasher_function_t *_rehasher) {
+  return CreateMyCustomOpParam(_fbb, _o, _rehasher);
+}
+
+inline flatbuffers::Offset<MyCustomOpParam> CreateMyCustomOpParam(flatbuffers::FlatBufferBuilder &_fbb, const MyCustomOpParamT *_o, const flatbuffers::rehasher_function_t *_rehasher) {
+  (void)_rehasher;
+  (void)_o;
+  struct _VectorArgs { flatbuffers::FlatBufferBuilder *__fbb; const MyCustomOpParamT* __o; const flatbuffers::rehasher_function_t *__rehasher; } _va = { &_fbb, _o, _rehasher}; (void)_va;
+  auto _opType = _o->opType;
+  auto _offset = _o->offset;
+  auto _dataType = _o->dataType;
+  return MNN::CreateMyCustomOpParam(
+      _fbb,
+      _opType,
+      _offset,
+      _dataType);
+}
+
 inline const flatbuffers::TypeTable *BinaryOpOperationTypeTable() {
   static const flatbuffers::TypeCode type_codes[] = {
     { flatbuffers::ET_CHAR, 0, 0 },
@@ -5166,6 +5315,28 @@ inline const flatbuffers::TypeTable *PadValueModeTypeTable() {
     "REFLECT",
     "SYMMETRIC",
     "EDGE"
+  };
+  static const flatbuffers::TypeTable tt = {
+    flatbuffers::ST_ENUM, 4, type_codes, type_refs, nullptr, names
+  };
+  return &tt;
+}
+
+inline const flatbuffers::TypeTable *MyCustomOpTypeTypeTable() {
+  static const flatbuffers::TypeCode type_codes[] = {
+    { flatbuffers::ET_INT, 0, 0 },
+    { flatbuffers::ET_INT, 0, 0 },
+    { flatbuffers::ET_INT, 0, 0 },
+    { flatbuffers::ET_INT, 0, 0 }
+  };
+  static const flatbuffers::TypeFunction type_refs[] = {
+    MyCustomOpTypeTypeTable
+  };
+  static const char * const names[] = {
+    "M_ADD",
+    "M_SUB",
+    "M_MUL",
+    "M_DIV"
   };
   static const flatbuffers::TypeTable tt = {
     flatbuffers::ST_ENUM, 4, type_codes, type_refs, nullptr, names
@@ -5918,6 +6089,27 @@ inline const flatbuffers::TypeTable *LSTMBlockCellTypeTable() {
   };
   static const flatbuffers::TypeTable tt = {
     flatbuffers::ST_TABLE, 3, type_codes, nullptr, nullptr, names
+  };
+  return &tt;
+}
+
+inline const flatbuffers::TypeTable *MyCustomOpParamTypeTable() {
+  static const flatbuffers::TypeCode type_codes[] = {
+    { flatbuffers::ET_INT, 0, 0 },
+    { flatbuffers::ET_INT, 0, -1 },
+    { flatbuffers::ET_INT, 0, 1 }
+  };
+  static const flatbuffers::TypeFunction type_refs[] = {
+    MyCustomOpTypeTypeTable,
+    DataTypeTypeTable
+  };
+  static const char * const names[] = {
+    "opType",
+    "offset",
+    "dataType"
+  };
+  static const flatbuffers::TypeTable tt = {
+    flatbuffers::ST_TABLE, 3, type_codes, type_refs, nullptr, names
   };
   return &tt;
 }

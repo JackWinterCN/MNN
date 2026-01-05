@@ -58,7 +58,7 @@ gen-external-apklibs
 
 # NDK
 obj/
-
+ndk/
 # IntelliJ IDEA
 *.iml
 *.iws

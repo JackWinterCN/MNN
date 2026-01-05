@@ -243,6 +243,7 @@ option(MNN_CUDA "Enable CUDA" OFF)
 option(MNN_TENSORRT "Enable TensorRT" OFF)
 option(MNN_COREML "Enable CoreML" OFF)
 option(MNN_NNAPI "Enable NNAPI" OFF)
+option(MNN_XPU "Enable XPU" OFF)
 
 option(MNN_GPU_TIME_PROFILE "Enable time profiling for the OpenCL backend and Vulkan backend." OFF)
 
@@ -292,6 +293,7 @@ message(STATUS "\toneDNN: ${MNN_ONEDNN}")
 message(STATUS "\tTensorRT: ${MNN_TENSORRT}")
 message(STATUS "\tCoreML: ${MNN_COREML}")
 message(STATUS "\tNNAPI: ${MNN_NNAPI}")
+message(STATUS "\tXPU: ${MNN_XPU}")
 message(STATUS "\tCUDA: ${MNN_CUDA}")
 message(STATUS "\tOpenMP: ${MNN_OPENMP}")
 message(STATUS "\tBF16: ${MNN_SUPPORT_BF16}")
@@ -622,6 +624,13 @@ IF(MNN_QNN)
     add_definitions(-DMNN_QNN_ENABLED=1)
     add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/source/backend/qnn/)
     list(APPEND MNN_OBJECTS_TO_LINK $<TARGET_OBJECTS:MNN_QNN>)
+ENDIF()
+
+# QNN
+IF(MNN_XPU)
+    add_definitions(-DMNN_XPU_ENABLED=1)
+    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/source/backend/xpu/)
+    list(APPEND MNN_OBJECTS_TO_LINK $<TARGET_OBJECTS:MNN_XPU>)
 ENDIF()
 
 # Vulkan

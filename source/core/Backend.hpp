@@ -107,7 +107,7 @@ public:
          - releases memory when `onClearBuffer` is called or when the backend is deleted.
          */
         DYNAMIC_SEPERATE,
-        
+
         DYNAMIC_IN_EXECUTION
     };
 
@@ -402,6 +402,33 @@ MNN_PUBLIC const RuntimeCreator* MNNGetExtraRuntimeCreator(MNNForwardType type);
  */
 MNN_PUBLIC bool MNNInsertExtraRuntimeCreator(MNNForwardType type, const RuntimeCreator* creator,
                                              bool needCheck = false);
+
+template <class T>
+class RuntimeRegister {
+public:
+  RuntimeRegister(MNNForwardType type) {
+    // if (!isAvailable()) {
+    //   return;
+    // }
+    // registerXPUOps();
+    MNNInsertExtraRuntimeCreator(type, new T, false);
+  }
+  ~RuntimeRegister() = default;
+};
+
+template <typename T>
+class TypedRuntimeCreator : public RuntimeCreator {
+public:
+  virtual Runtime *onCreate(const Backend::Info &info) const override {
+    return new T(info);
+  }
+  virtual bool onValid(Backend::Info &info) const override { return true; }
+};
+
+#define REGISTER_RUNTIME_CREATOR(RuntimeClass, ForwardType)                    \
+  namespace {                                                                  \
+  RuntimeRegister<TypedRuntimeCreator<RuntimeClass>> _registrar(ForwardType);  \
+  }
 
 MNN_PUBLIC bool MNNCPUCopyBuffer(const Tensor* srcTensor, const Tensor* dstTensor);
 } // namespace MNN

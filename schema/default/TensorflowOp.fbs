@@ -350,3 +350,16 @@ table LSTMBlockCell {
     forget_bias:float = 1.0;
     use_peephole:bool = false;
 }
+
+enum MyCustomOpType : int {
+    M_ADD = 0,
+    M_SUB = 1,
+    M_MUL = 2,
+    M_DIV = 3,
+}
+
+table MyCustomOpParam {
+    opType:MyCustomOpType;
+    offset:int;
+    dataType:DataType=DT_FLOAT;
+}
