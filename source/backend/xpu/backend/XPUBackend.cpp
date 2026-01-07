@@ -2,6 +2,7 @@
 
 #include <MNN/MNNForwardType.h>
 #include "core/OpCommonUtils.hpp"
+#include "backend/xpu/backend/XPURunningUtils.hpp"
 #include "backend/xpu/execution/XPUCast.hpp"
 #include "backend/xpu/execution/XPUTensorConvert.hpp"
 
@@ -97,7 +98,7 @@ Backend::MemObj *XPUBackend::onAcquire(const Tensor *tensor,
                                        StorageType storageType) {
   MNN_PRINT("[XPU] XPUBackend::onAcquire().\n");
 
-  auto tensorShape = tensorShapeFormat(tensor);
+  auto tensorShape = XPU::tensorShapeFormat(tensor);
   int N = tensorShape.at(0);
   int H = tensorShape.at(1);
   int W = tensorShape.at(2);
@@ -138,13 +139,13 @@ bool XPUBackend::onClearBuffer() {
 
 void XPUBackend::copyFromDevice(const Tensor* srcTensor, const Tensor* dstTensor) const{
     auto needSize = dstTensor->size();
-    auto shape = tensorShapeFormat(srcTensor);
+    auto shape = XPU::tensorShapeFormat(srcTensor);
     auto srcDimensionFormat = TensorUtils::getDescribe(srcTensor)->dimensionFormat;
     auto dstDimensionFormat = TensorUtils::getDescribe(dstTensor)->dimensionFormat;
     auto memType = dstTensor->buffer().flags;
     bool directCopy = (srcDimensionFormat == dstDimensionFormat || srcTensor->dimensions() <= 1)
                        && MNN::MNN_DATA_FORMAT_NC4HW4 != dstDimensionFormat && MNN_DATA_FORMAT_NC4HW4 != srcDimensionFormat
-                       && (getDataType(srcTensor) == getDataType(dstTensor));
+                       && (XPU::getDataType(srcTensor) == XPU::getDataType(dstTensor));
     if (mPrecision != BackendConfig::Precision_High) { // Fp16
         if (dstTensor->getType().code == halide_type_float) {
             directCopy = false;
@@ -160,13 +161,13 @@ void XPUBackend::copyFromDevice(const Tensor* srcTensor, const Tensor* dstTensor
     } else {
       MNN_ERROR("copyFromDevice can NOT direct copy, srcDimensionFormat:%d, "
                 "dstDimensionFormat:%d, dataType:%d\n",
-                srcDimensionFormat, dstDimensionFormat, getDataType(srcTensor));
+                srcDimensionFormat, dstDimensionFormat, XPU::getDataType(srcTensor));
     }
 }
 
 void XPUBackend::copyToDevice(const Tensor* srcTensor, const Tensor* dstTensor) const{
     auto needSize = srcTensor->size();
-    auto shape = tensorShapeFormat(srcTensor);
+    auto shape = XPU::tensorShapeFormat(srcTensor);
     auto srcDimensionFormat = TensorUtils::getDescribe(srcTensor)->dimensionFormat;
     auto dstDimensionFormat = TensorUtils::getDescribe(dstTensor)->dimensionFormat;
     auto memType = srcTensor->buffer().flags;
@@ -174,7 +175,7 @@ void XPUBackend::copyToDevice(const Tensor* srcTensor, const Tensor* dstTensor) 
 
     bool directCopy = (srcDimensionFormat == dstDimensionFormat || srcTensor->dimensions() <= 1)
                        && MNN_DATA_FORMAT_NC4HW4 != dstDimensionFormat && MNN_DATA_FORMAT_NC4HW4 != srcDimensionFormat
-                       && (getDataType(srcTensor) == getDataType(dstTensor));
+                       && (XPU::getDataType(srcTensor) == XPU::getDataType(dstTensor));
     if (mPrecision != BackendConfig::Precision_High) { // Fp16
         if (dstTensor->getType().code == halide_type_float) {
             directCopy = false;
@@ -188,7 +189,7 @@ void XPUBackend::copyToDevice(const Tensor* srcTensor, const Tensor* dstTensor) 
     } else {
       MNN_ERROR("copyToDevice can NOT direct copy, srcDimensionFormat:%d, "
                 "dstDimensionFormat:%d, dataType:%d\n",
-                srcDimensionFormat, dstDimensionFormat, getDataType(srcTensor));
+                srcDimensionFormat, dstDimensionFormat, XPU::getDataType(srcTensor));
     }
 }
 
@@ -281,14 +282,6 @@ bool XPUBackend::addOpCreator(OpType t, OpCreator *c) {
   }
   mOpCreatorsMap.insert(std::make_pair(t, c));
   return true;
-}
-
-DataType XPUBackend::getDataType(const Tensor* tensor) {
-    auto des = TensorUtils::getDescribe(tensor);
-    if (nullptr == des->quantAttr.get()) {
-        return DataType_DT_FLOAT;
-    }
-    return des->type;
 }
 
 float XPUBackend::getBytes(const Tensor* tensor) {

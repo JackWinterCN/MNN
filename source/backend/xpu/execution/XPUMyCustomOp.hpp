@@ -1,10 +1,10 @@
 #ifndef XPUMYCUSTOMOP_HPP
 #define XPUMYCUSTOMOP_HPP
 
+#include "MNN_generated.h"
 #include "backend/xpu/backend/XPUBackend.hpp"
 #include "core/AutoStorage.h"
 #include "core/Execution.hpp"
-#include "MNN_generated.h"
 
 namespace MNN {
 

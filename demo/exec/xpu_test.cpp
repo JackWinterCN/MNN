@@ -15,18 +15,21 @@ using namespace MNN::Express;
 
 int main(int argc, char* argv[]) {
     if (argc < 3) {
-        std::cout << "Usage: ./xpu_test.out model.mnn len forwardType" << std::endl;
-        return -1;
+      std::cout << "Usage: ./xpu_test.out model.mnn len1 len2 forwardType"
+                << std::endl;
+      return -1;
     }
 
     const auto modelFile = argv[1];
-    const auto len_str  = argv[2];
-    const int len = std::stoi(len_str);
+    const auto len1_str = argv[2];
+    const auto len2_str = argv[3];
+    const int len1 = std::stoi(len1_str);
+    const int len2 = std::stoi(len2_str);
     int thread = 4;
     int precision = BackendConfig::Precision_High;
     int forwardType = MNN_FORWARD_CPU;
-    if (argc > 3) {
-        forwardType = std::stoi(argv[3]);
+    if (argc > 4) {
+      forwardType = std::stoi(argv[4]);
     }
 
     MNN::ScheduleConfig sConfig;
@@ -46,19 +49,17 @@ int main(int argc, char* argv[]) {
     std::shared_ptr<Module> net(Module::load(std::vector<std::string>{},
                                              std::vector<std::string>{},
                                              modelFile, rtmgr));
-    VARP X = _Input({1, 1, 1, len}, NCHW);
+    VARP X = _Input({1, 1, 1, len1}, NCHW);
     auto X_ptr = X->writeMap<float>();
-    VARP Y = _Input({1, 1, 1, len}, NCHW);
-    auto Y_ptr = Y->writeMap<float>();
-    for (int i = 0; i < len; i++) {
-        X_ptr[i] = i*i;
-        Y_ptr[i] = i+i;
-    }
-    for (int i = 0; i < len; i++) {
+    for (int i = 0; i < len1; i++) {
+      X_ptr[i] = (i + 1) * (i + 1);
       printf("X_ptr[%d] = %f\t", i, X_ptr[i]);
     }
     printf("\n");
-    for (int i = 0; i < len; i++) {
+    VARP Y = _Input({1, 1, 1, len2}, NCHW);
+    auto Y_ptr = Y->writeMap<float>();
+    for (int i = 0; i < len2; i++) {
+      Y_ptr[i] = (i + 1) + (i + 1);
       printf("Y_ptr[%d] = %f\t", i, Y_ptr[i]);
     }
     printf("\n");
@@ -68,9 +69,10 @@ int main(int argc, char* argv[]) {
         MNN_ERROR("Z is empty\n");
         return 0;
     }
+    MNN_PRINT("Z[0]->getInfo()->size = %ld\n", Z[0]->getInfo()->size);
     auto Z_ptr = Z[0]->readMap<float>();
-    for (int i = 0; i < len; i++) {
-        printf("Z_ptr[%d] = %f\t", i, Z_ptr[i]);
+    for (int i = 0; i < Z[0]->getInfo()->size; i++) {
+      printf("Z_ptr[%d] = %f\t", i, Z_ptr[i]);
     }
     printf("\n");
 
