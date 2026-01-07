@@ -47,8 +47,11 @@ XPUBackend::XPUBackend(const XPURuntime *runtime) : Backend(MNN_FORWARD_XPU) {
   mRuntime = runtime;
   mPrecision = mRuntime->mPrecision;
 
+  mExecutionBufferPool.reset(new XPU::XPUMemPool);
 }
-XPUBackend::~XPUBackend() {}
+XPUBackend::~XPUBackend() {
+  mExecutionBufferPool->clear();
+}
 
 Execution *XPUBackend::onCreate(const std::vector<Tensor *> &inputs,
                                 const std::vector<Tensor *> &outputs,
@@ -75,13 +78,6 @@ Execution *XPUBackend::onCreate(const std::vector<Tensor *> &inputs,
 
 void XPUBackend::XPUBackend::onExecuteBegin() const {
   MNN_PRINT("[XPU] XPUBackend::onExecuteBegin().\n");
-  // mRuntime->pCurrentStatus = mDmaInfo->mDynamicAllocator->apply();
-  // if (NO_ERROR != mRuntime->pCurrentStatus) {
-  //   return;
-  // }
-  // if (nullptr != mDmaInfo->mDynamicAllocatorBackup.get()) {
-  //   mRuntime->pCurrentStatus = mDmaInfo->mDynamicAllocatorBackup->apply();
-  // }
 }
 
 void XPUBackend::onExecuteEnd() const {
@@ -90,15 +86,10 @@ void XPUBackend::onExecuteEnd() const {
 
 void XPUBackend::onResizeBegin() {
     MNN_PRINT("[XPU] XPUBackend::onResizeBegin().\n");
-    // mDmaInfo->mCurrentDynamicAllocator->reset();
 }
 
 ErrorCode XPUBackend::onResizeEnd() {
   MNN_PRINT("[XPU] XPUBackend::onResizeEnd().\n");
-  // auto code = mDmaInfo->mCurrentDynamicAllocator->compute();
-  // if (NO_ERROR != code) {
-  //   return code;
-  // }
   return NO_ERROR;
 }
 
@@ -106,65 +97,38 @@ Backend::MemObj *XPUBackend::onAcquire(const Tensor *tensor,
                                        StorageType storageType) {
   MNN_PRINT("[XPU] XPUBackend::onAcquire().\n");
 
-  auto nativeTensor = (Tensor *)tensor;
-  auto size = tensor->size();
-  Tensor *dest = nativeTensor;
-  auto originMem = TensorUtils::getDescribeOrigin(dest)->mem.get();
-  if (nullptr != originMem) {
-    if (static_cast<XPUMemObj *>(originMem)->getSize() >= size) {
-      return originMem;
-    } else {
-      TensorUtils::getDescribeOrigin(dest)->mem = nullptr;
-    }
-  }
-  // MNN_PRINT("Acquire size = %d\n", size);
-  if (size <= 0) {
-    MNN_PRINT("Acquire buffer size = %lu\n", size);
-    MNN_ASSERT(false);
-    return nullptr;
-  }
-  // if (size > LARGE_MEMORY) {
-  //     MNN_PRINT("Size larger than 500 M :%d\n", size);
-  // }
-  auto &buffer = dest->buffer();
-  auto des = TensorUtils::getDescribe(dest);
-  MemChunk chunk;
-  switch (storageType) {
-    case STATIC: {
-      chunk = mRuntime->mStaticAllocator->alloc(size, false);
-      break;
-    }
-    case DYNAMIC: {
-      // chunk = mDmaInfo->mCurrentDynamicAllocator->alloc(size, false);
-      break;
-    }
-    case DYNAMIC_SEPERATE: {
-      // chunk = mDmaInfo->mCurrentDynamicAllocator->alloc(size, true);
-      break;
-    }
-    default:
-      MNN_ASSERT(false);
-      break;
-  }
+  auto tensorShape = tensorShapeFormat(tensor);
+  int N = tensorShape.at(0);
+  int H = tensorShape.at(1);
+  int W = tensorShape.at(2);
+  int C = tensorShape.at(3);
 
-  if (chunk.invalid()) {
-    MNN_ERROR("Alloc buffer error for cpu backend\n");
-    return nullptr;
-  }
+  MNN_PRINT("NHWC:[%d, %d, %d, %d]\n", N, H, W, C);
 
-  Backend::MemObj *res = nullptr;
-
-  if (storageType == STATIC) {
-    res = new XPUMemObj(mRuntime->mStaticAllocator.get(), chunk, size);
+  size_t size;
+  float typeSize = getBytes(tensor);
+  MNN_PRINT("typeSize: %f\n", typeSize);
+  if (MNN_DATA_FORMAT_NC4HW4 == TensorUtils::getDescribe(tensor)->dimensionFormat &&
+      tensor->dimensions() >= 2) {
+    auto alignC = ROUND_UP(C, 4);
+    // increment of height and width
+    auto hR = ROUND_UP(H + 3, 4) - H;
+    auto wR = ROUND_UP(W + 3, 4) - W;
+    size = N * alignC * W * H;
+    size = size + hR * W * 4 + wR * 4;
   } else {
-    res = new XPUMemObj(mDmaInfo->mCurrentDynamicAllocator, chunk, size);
-    chunk.attach(dest);
+    size = N * H * W * C;
+    size = ROUND_UP(size, 4);
   }
-  if (chunk.ptr()) {
-    buffer.host = chunk.ptr();
+  size = ROUND_UP(size, 2);
+  MNN_PRINT("size: %ld\n", size);
+  if (storageType != STATIC) {
+    MNN_ERROR("not support storageType %d\n", storageType);
+    return nullptr;
   }
-  des->extra.offset = 0;
-  return res;
+  auto node = mExecutionBufferPool->alloc(size * typeSize);
+  ((Tensor *)tensor)->buffer().device = reinterpret_cast<uint64_t>(node->physical_addr);
+  return new XPU::XPUDeviceMemObj(node, mExecutionBufferPool.get());
 }
 
 bool XPUBackend::onClearBuffer() {
@@ -172,69 +136,140 @@ bool XPUBackend::onClearBuffer() {
   return true;
 }
 
+void XPUBackend::copyFromDevice(const Tensor* srcTensor, const Tensor* dstTensor) const{
+    auto needSize = dstTensor->size();
+    auto shape = tensorShapeFormat(srcTensor);
+    auto srcDimensionFormat = TensorUtils::getDescribe(srcTensor)->dimensionFormat;
+    auto dstDimensionFormat = TensorUtils::getDescribe(dstTensor)->dimensionFormat;
+    auto memType = dstTensor->buffer().flags;
+    bool directCopy = (srcDimensionFormat == dstDimensionFormat || srcTensor->dimensions() <= 1)
+                       && MNN::MNN_DATA_FORMAT_NC4HW4 != dstDimensionFormat && MNN_DATA_FORMAT_NC4HW4 != srcDimensionFormat
+                       && (getDataType(srcTensor) == getDataType(dstTensor));
+    if (mPrecision != BackendConfig::Precision_High) { // Fp16
+        if (dstTensor->getType().code == halide_type_float) {
+            directCopy = false;
+        }
+    }
+
+    if (directCopy) {
+      void *hostPtr = dstTensor->host<float>();
+      memcpy(hostPtr, (void *)srcTensor->deviceId(), needSize);
+      MNN_PRINT("direct copy %d bytes, device addr: %p -> host addr: %p\n", needSize,
+                (void *)srcTensor->deviceId(), hostPtr);
+      return;
+    } else {
+      MNN_ERROR("copyFromDevice can NOT direct copy, srcDimensionFormat:%d, "
+                "dstDimensionFormat:%d, dataType:%d\n",
+                srcDimensionFormat, dstDimensionFormat, getDataType(srcTensor));
+    }
+}
+
+void XPUBackend::copyToDevice(const Tensor* srcTensor, const Tensor* dstTensor) const{
+    auto needSize = srcTensor->size();
+    auto shape = tensorShapeFormat(srcTensor);
+    auto srcDimensionFormat = TensorUtils::getDescribe(srcTensor)->dimensionFormat;
+    auto dstDimensionFormat = TensorUtils::getDescribe(dstTensor)->dimensionFormat;
+    auto memType = srcTensor->buffer().flags;
+    void* hostPtr = srcTensor->host<float>();
+
+    bool directCopy = (srcDimensionFormat == dstDimensionFormat || srcTensor->dimensions() <= 1)
+                       && MNN_DATA_FORMAT_NC4HW4 != dstDimensionFormat && MNN_DATA_FORMAT_NC4HW4 != srcDimensionFormat
+                       && (getDataType(srcTensor) == getDataType(dstTensor));
+    if (mPrecision != BackendConfig::Precision_High) { // Fp16
+        if (dstTensor->getType().code == halide_type_float) {
+            directCopy = false;
+        }
+    }
+    if(directCopy){
+      memcpy((void *)dstTensor->deviceId(), hostPtr, needSize);
+      MNN_PRINT("direct copy %d bytes, host addr: %p -> device addr: %p\n",
+                needSize, hostPtr, (void *)dstTensor->deviceId());
+      return;
+    } else {
+      MNN_ERROR("copyToDevice can NOT direct copy, srcDimensionFormat:%d, "
+                "dstDimensionFormat:%d, dataType:%d\n",
+                srcDimensionFormat, dstDimensionFormat, getDataType(srcTensor));
+    }
+}
+
+// void XPUBackend::copyBetweenDevice(const Tensor* srcTensor, const Tensor* dstTensor) const{
+//     int srcMemtype = srcTensor->buffer().flags;
+//     int dstMemtype = dstTensor->buffer().flags;
+//     if(MNN_FORWARD_CPU == srcMemtype && MNN_FORWARD_CPU == dstMemtype){
+//         mCLRuntime->copyBetweenDevice(srcTensor, dstTensor, mPrecision, mMemType);
+//     } else {
+//         const Tensor* hostTensor = MNN_FORWARD_CPU != srcMemtype ? srcTensor : dstTensor;
+//         const Tensor* deviceTensor = MNN_FORWARD_CPU == srcMemtype ? srcTensor : dstTensor;
+//         MNN_DATA_FORMAT data_format = TensorUtils::getDescribe(deviceTensor)->dimensionFormat;
+
+//         bool alloc_error = _allocHostBuffer(0, hostTensor);
+//         if(false == alloc_error){
+//             MNN_ERROR("Alloc _allocHostBuffer error\n");
+//             return;
+//         }
+
+//         //Covert format
+//         if(MNN_FORWARD_CPU != srcMemtype){
+//             mCLRuntime->convertToDevice(hostTensor, deviceTensor, data_format, mPrecision, mMemType, false, srcMemtype);
+//         }else{
+//             mCLRuntime->convertFromDevice(deviceTensor, hostTensor, data_format, mPrecision, mMemType, false, dstMemtype);
+//         }
+//     }
+// }
+
+// void CLRuntime::copyBetweenDevice(const Tensor* srcTensor, const Tensor* dstTensor, int precision, int backend_memtype) const{
+//     int input_precision = ((OpenCLBackend*)(TensorUtils::getDescribeOrigin(srcTensor)->getBackend()))->getPrecision();
+//     int output_precision = ((OpenCLBackend*)(TensorUtils::getDescribeOrigin(dstTensor)->getBackend()))->getPrecision();
+//     #ifndef MNN_OPENCL_BUFFER_CLOSED
+//     if(backend_memtype == BUFFER)
+//     {
+//         OpenCL::convertBufferToBuffer(const_cast<Tensor*>(srcTensor), const_cast<Tensor*>(dstTensor), mOpenCLRuntime.get(), input_precision, output_precision, precision, true, true);
+//     }
+//     else
+//     #endif /* MNN_OPENCL_BUFFER_CLOSED */
+//     if(input_precision == output_precision){
+//         std::vector<int> bufferShape = MNN::OpenCL::tensorShapeFormat(srcTensor);
+
+//         mOpenCLRuntime.get()->commandQueue().enqueueCopyImage(
+//                 openCLImage(srcTensor), openCLImage(dstTensor),
+//                 {0, 0, 0}, {0, 0, 0},
+//                 {(size_t)bufferShape[2]* UP_DIV(bufferShape[3], 4), (size_t)bufferShape[0]*bufferShape[1], 1});
+//     } else{
+//         OpenCL::convertImageToImage(const_cast<Tensor*>(srcTensor), const_cast<Tensor*>(dstTensor), mOpenCLRuntime.get(), input_precision, output_precision, precision);
+//     }
+//     return;
+// }
+
+
+// void OpenCLBackend::onCopyBuffer(const Tensor* srcTensor, const Tensor* dstTensor) const {
+//     clearRecord();
+//     if (srcTensor->host<float>() != nullptr) {
+//         copyToDevice(srcTensor, dstTensor);
+//     }else if(dstTensor->host<void>() != nullptr){
+//         copyFromDevice(srcTensor, dstTensor);
+//     }else{
+//         copyBetweenDevice(srcTensor, dstTensor);
+//     }
+
+// }
+
 void XPUBackend::onCopyBuffer(const Tensor *srcTensor,
                               const Tensor *dstTensor) const {
   MNN_PRINT("[XPU] XPUBackend::onCopyBuffer().\n");
-
-  auto &srcBuffer = srcTensor->buffer();
-  auto &dstBuffer = dstTensor->buffer();
-  if (srcBuffer.dimensions != dstBuffer.dimensions) {
-    MNN_ERROR("srcBuffer dimension not equal to dstBuffer, can't copy buffer\n");
+  if (srcTensor->host<float>() == nullptr) {
+    MNN_PRINT("srcTensor host: null\n");
   }
-  if (srcTensor->getDimensionType() == dstTensor->getDimensionType()) {
-    for (int i = 0; i < srcBuffer.dimensions; ++i) {
-      MNN_ASSERT(srcBuffer.dim[i].extent <= dstBuffer.dim[i].extent);
-    }
+  if (dstTensor->host<void>() == nullptr) {
+    MNN_PRINT("dstTensor host: null\n");
   }
-  if (nullptr == srcBuffer.host || nullptr == dstBuffer.host) {
-    return;
-  }
-  std::unique_ptr<Tensor> wrapTensor;
-  if (getDataType(srcTensor) != getDataType(dstTensor)) {
-    auto dimType = OpCommonUtils::convertDimType(
-        TensorUtils::getDescribe(srcTensor)->dimensionFormat);
-    auto convertType = XPUCastCreator::FlOAT_TO_INT8;
-    if (getDataType(srcTensor) == DataType_DT_INT8) {
-      convertType = XPUCastCreator::INT8_TO_FlOAT;
-    }
-    wrapTensor.reset(Tensor::createDevice(srcTensor->shape(),
-                                          dstTensor->getType(), dimType));
-    auto dstType = getDataType(dstTensor);
-    if (dstType != DataType_DT_FLOAT) {
-      wrapTensor->setType(dstType);
-    }
-    wrapTensor->buffer().host = (uint8_t *)MNNMemoryAllocAlign(
-        wrapTensor->size(),
-        MNN_MEMORY_ALIGN_DEFAULT);
-
-#ifdef LOG_VERBOSE
-    MNN_PRINT("CPU backend copy tensor ptr:%p -> ptr:%p hostPtr:%p -> %p, "
-              "format %d -> %d, dims: [",
-              srcTensor, dstTensor, srcTensor->host<void>(),
-              dstTensor->host<void>(),
-              TensorUtils::getDescribe(srcTensor)->dimensionFormat,
-              TensorUtils::getDescribe(dstTensor)->dimensionFormat);
-    for (int i = 0; i < srcTensor->dimensions(); ++i) {
-      MNN_PRINT("%d ", srcTensor->length(i));
-    }
-    MNN_PRINT("]\n");
-#endif
-
-    TensorUtils::getDescribe(wrapTensor.get())->memoryType =
-        Tensor::InsideDescribe::MEMORY_HOST;
-    auto code =
-        XPUCastCreator::cast(srcTensor, wrapTensor.get(), this, convertType);
-    if (NO_ERROR != code) {
-      MNN_ERROR("Error in CPUBackend::onCopyBuffer:cast\n");
-    }
-    srcTensor = wrapTensor.get();
-  } else if (srcTensor->getType() != dstTensor->getType()) {
-    MNN_ERROR("Input type not match session's tensor\n");
-    return;
-  }
-  auto code = XPUTensorConverter::convert(srcTensor, dstTensor);
-  if (NO_ERROR != code) {
-    MNN_ERROR("Error in CPUBackend::onCopyBuffer:convert\n");
+  if (srcTensor->host<float>() != nullptr) {
+    MNN_PRINT("copyToDevice\n");
+    copyToDevice(srcTensor, dstTensor);
+  } else if (dstTensor->host<void>() != nullptr) {
+    MNN_PRINT("copyFromDevice\n");
+    copyFromDevice(srcTensor, dstTensor);
+  } else {
+    MNN_PRINT("copyBetweenDevice[Not supported]\n");
   }
 }
 
@@ -256,4 +291,21 @@ DataType XPUBackend::getDataType(const Tensor* tensor) {
     return des->type;
 }
 
+float XPUBackend::getBytes(const Tensor* tensor) {
+    float bytes = (float)tensor->getType().bytes();
+    if (mPrecision != BackendConfig::Precision_High) {// Fp16
+        if (halide_type_float == tensor->getType().code) {
+            bytes = 2.0;
+        }
+    }
+    auto quant = TensorUtils::getDescribe(tensor)->quantAttr.get();
+    if (nullptr != quant && TensorUtils::getDescribe(tensor)->type == DataType_DT_INT8) {
+        bytes = 1.0;
+    }
+    if(tensor->getType().bits == 4) {
+        bytes = 0.5;
+    }
+    return bytes;
 }
+
+}

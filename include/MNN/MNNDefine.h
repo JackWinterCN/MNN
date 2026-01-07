@@ -35,8 +35,8 @@
 #define MNN_PRINT(format, ...) syslog(LOG_WARNING, format, ##__VA_ARGS__); fprintf(stderr, format, ##__VA_ARGS__)
 #define MNN_ERROR(format, ...) syslog(LOG_WARNING, format, ##__VA_ARGS__); fprintf(stderr, format, ##__VA_ARGS__)
 #else
-#define MNN_PRINT(format, ...) printf(format, ##__VA_ARGS__)
-#define MNN_ERROR(format, ...) printf(format, ##__VA_ARGS__)
+#define MNN_PRINT(format, ...) {printf("[%s:%d] ", __FILE__, __LINE__); printf(format, ##__VA_ARGS__);}
+#define MNN_ERROR(format, ...) {printf("[%s:%d] ", __FILE__, __LINE__); printf(format, ##__VA_ARGS__);}
 #endif
 
 #ifdef DEBUG
@@ -51,8 +51,8 @@
 #else
 #define MNN_ASSERT(x)
 #endif
-#define FUNC_PRINT(x) MNN_PRINT(#x "=%d in %s:%d %s\n", x, __FILE__, __LINE__, __func__);
-#define FUNC_PRINT_ALL(x, type) MNN_PRINT(#x "=" #type " %" #type " in %s, %d \n", x, __func__, __LINE__);
+#define FUNC_PRINT(x) MNN_PRINT(#x "=%d \n", x);
+#define FUNC_PRINT_ALL(x, type) MNN_PRINT(#x "=" #type " %" #type "\n", x);
 
 #define MNN_CHECK(success, log) \
 if(!(success)){ \

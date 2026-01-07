@@ -13,57 +13,58 @@
 #include <map>
 #include <memory>
 #include <vector>
+#include <core/Backend.hpp>
 #include "core/NonCopyable.hpp"
-#include "backend/opencl/core/runtime/OpenCLWrapper.hpp"
 
 namespace MNN {
 namespace XPU {
-struct OpenCLBufferNode{
-    OpenCLBufferNode(){};
-    size_t size;
-    std::shared_ptr<cl::Buffer> buffer;
+
+struct XPUMemNode{
+    XPUMemNode(){};
+    ~XPUMemNode(){
+        MNN_PRINT("[XPU] ~XPUMemNode(): 0x%lx size: %lu\n", physical_addr, size);
+        if(physical_addr){
+            delete[] (int8_t*)physical_addr;
+        }
+    }
+    size_t size{0};
+    uint64_t physical_addr{0};
 };
 
-class BufferPool : public NonCopyable {
-public:
-    BufferPool(cl::Context& context, cl_mem_flags flags) : mContext(context) {
-        mFlag = flags;
-    }
 
-    cl::Buffer* alloc(size_t size, bool separate = false);
-    void recycle(cl::Buffer* buffer, bool release = false);
+class XPUMemPool : public NonCopyable {
+public:
+    // XPUMemPool(cl::Context& context, cl_mem_flags flags) : mContext(context) {
+    //     mFlag = flags;
+    // }
+    XPUMemPool() {}
+    std::shared_ptr<XPUMemNode> alloc(size_t size, bool separate = false);
+    void recycle(std::shared_ptr<XPUMemNode> node, bool release = false);
     void clear();
     void releaseFreeList();
     size_t totalSize() { return mTotalSize; }
 
 private:
-    std::map<cl::Buffer*, std::shared_ptr<OpenCLBufferNode>> mAllBuffer;
-    std::multimap<size_t, std::shared_ptr<OpenCLBufferNode>> mFreeList;
+    std::set<std::shared_ptr<XPUMemNode>> mAllBuffer;
+    std::multimap<size_t, std::shared_ptr<XPUMemNode>> mFreeList;
 
-    cl::Context& mContext;
-    cl_mem_flags mFlag;
+    // cl::Context& mContext;
+    // cl_mem_flags mFlag;
     size_t mTotalSize = 0;
 };
-
-class BufferExecutionPool : public NonCopyable {
+class XPUDeviceMemObj : public Backend::MemObj {
 public:
-    BufferExecutionPool(cl::Context& context, cl::CommandQueue& command, cl_mem_flags flags) : mContext(context), mCommand(command) {
-        mFlag = flags;
-    }
+  XPUDeviceMemObj(std::shared_ptr<XPUMemNode> node, XPUMemPool *bufferPool) {
+    mNode = node;
+    mBufferPool = bufferPool;
+  }
+  virtual ~XPUDeviceMemObj() {
+    mBufferPool->recycle(mNode);
+  }
 
-    std::shared_ptr<OpenCLBufferNode> alloc(size_t size, bool separate = false);
-    void recycle(std::shared_ptr<OpenCLBufferNode> node, bool release = false);
-    void clear();
-    void releaseFreeList();
-    size_t totalSize() { return mTotalSize; }
 private:
-    std::set<std::shared_ptr<OpenCLBufferNode>> mAllBuffer;
-    std::multimap<size_t, std::shared_ptr<OpenCLBufferNode>> mFreeList;
-
-    cl::Context& mContext;
-    cl::CommandQueue& mCommand;
-    cl_mem_flags mFlag;
-    size_t mTotalSize = 0;
+  std::shared_ptr<XPUMemNode> mNode;
+  XPUMemPool *mBufferPool;
 };
 
 } // namespace XPU

@@ -3,6 +3,7 @@
 
 #include <vector>
 
+#include "XPUMemPool.hpp"
 #include <core/Backend.hpp>
 #include <core/Execution.hpp>
 #include <core/TensorUtils.hpp>
@@ -88,12 +89,19 @@ public:
                             const Tensor *dstTensor) const override;
   static DataType getDataType(const Tensor* tensor);
   static bool addOpCreator(OpType t, OpCreator *c);
-
+private:
+    float getBytes(const Tensor* tensor);
+    void copyFromDevice(const Tensor* srcTensor, const Tensor* dstTensor) const;
+    void copyToDevice(const Tensor* srcTensor, const Tensor* dstTensor) const;
+    // void copyFromDeviceInt8(const Tensor* srcTensor, const Tensor* dstTensor) const;
+    // void copyToDeviceInt8(const Tensor* srcTensor, const Tensor* dstTensor) const;
+    void copyBetweenDevice(const Tensor* srcTensor, const Tensor* dstTensor) const;
 private:
   static std::map<OpType, OpCreator *> mOpCreatorsMap;
   const XPURuntime *mRuntime;
   BackendConfig::PrecisionMode mPrecision;
   std::shared_ptr<XPURuntime::DynamicAllocator> mDmaInfo;
+  std::shared_ptr<XPU::XPUMemPool> mExecutionBufferPool;
 };
 
 template <class T>
@@ -153,6 +161,58 @@ public:
 //   };                                                                           \
 //   OpClass##CreatorRegister _registrar();                                       \
 //   }
+
+inline std::vector<int> tensorShapeFormat(const Tensor *input) {
+
+    int iN = (0 != input->buffer().dim[0].extent) ? input->buffer().dim[0].extent : 1;
+    int iC = (0 != input->buffer().dim[1].extent) ? input->buffer().dim[1].extent : 1;
+    int iH = (0 != input->buffer().dim[2].extent) ? input->buffer().dim[2].extent : 1;
+    int iW = (0 != input->buffer().dim[3].extent) ? input->buffer().dim[3].extent : 1;
+
+    if(input->buffer().dimensions > 4)//more than 4 dimensions put to N dimension
+    {
+        for(int i = 4; i < input->buffer().dimensions; i++)
+        {
+            iW *= input->buffer().dim[i].extent;
+        }
+    }
+
+    if (TensorUtils::getDescribe(input)->dimensionFormat == MNN::MNN_DATA_FORMAT_NHWC)
+    {
+        iN = (0 < input->buffer().dim[0].extent) ? input->buffer().dim[0].extent : 1;
+        iH = (0 < input->buffer().dim[1].extent) ? input->buffer().dim[1].extent : 1;
+        iW = (0 < input->buffer().dim[2].extent) ? input->buffer().dim[2].extent : 1;
+        iC = (0 < input->buffer().dim[3].extent) ? input->buffer().dim[3].extent : 1;
+
+        if(input->buffer().dimensions > 4)//more than 4 dimensions put to N dimension
+        {
+            for(int i = 4; i < input->buffer().dimensions; i++)
+            {
+                iC *= input->buffer().dim[i].extent;
+            }
+        }
+    }
+
+    if (input->buffer().dimensions == 2) {
+        iN = input->buffer().dim[0].extent;
+        iH = 1;
+        iW = 1;
+        iC = input->buffer().dim[1].extent;
+    }
+    if (input->buffer().dimensions == 1) {
+        iN = 1;
+        iH = 1;
+        iW = 1;
+        iC = input->buffer().dim[0].extent;
+    }
+
+#ifdef LOG_VERBOSE
+    MNN_PRINT("tensorShapeFormat : [%d, %d, %d, %d] \n", iN, iH, iW, iC);
+#endif
+    std::vector<int> shape_vec{iN, iH, iW, iC};
+
+    return shape_vec;
+}
 
 } // namespace MNN
 #endif // MNN_XPU_BACKEND_HPP

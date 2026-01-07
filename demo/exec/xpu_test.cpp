@@ -23,7 +23,7 @@ int main(int argc, char* argv[]) {
     const auto len_str  = argv[2];
     const int len = std::stoi(len_str);
     int thread = 4;
-    int precision = 0;
+    int precision = BackendConfig::Precision_High;
     int forwardType = MNN_FORWARD_CPU;
     if (argc > 3) {
         forwardType = std::stoi(argv[3]);
@@ -64,7 +64,10 @@ int main(int argc, char* argv[]) {
     printf("\n");
 
     auto Z = net->onForward({X, Y});
-
+    if (Z.empty()) {
+        MNN_ERROR("Z is empty\n");
+        return 0;
+    }
     auto Z_ptr = Z[0]->readMap<float>();
     for (int i = 0; i < len; i++) {
         printf("Z_ptr[%d] = %f\t", i, Z_ptr[i]);

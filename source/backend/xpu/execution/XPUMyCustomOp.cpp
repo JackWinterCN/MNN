@@ -38,9 +38,18 @@ ErrorCode XPUMyCustomOp::onExecute(const std::vector<Tensor *> &inputs,
   auto input1 = inputs[1];
   auto output = outputs[0];
 
-  auto input0Ptr = input->host<uint8_t>();
-  auto input1Ptr = input1->host<uint8_t>();
-  auto outputPtr = output->host<uint8_t>();
+  auto input0Ptr = (uint8_t *)input->deviceId();
+  auto input1Ptr = (uint8_t *)input1->deviceId();
+  auto outputPtr = (uint8_t *)output->deviceId();
+  // auto input0Ptr = input->host<uint8_t>();
+  // auto input1Ptr = input1->host<uint8_t>();
+  // auto outputPtr = output->host<uint8_t>();
+
+  if (input0Ptr == nullptr || input1Ptr == nullptr || outputPtr == nullptr) {
+    MNN_ERROR("null device mem, input0Ptr: %p, input1Ptr: %p, outputPtr: %p\n",
+              input0Ptr, input1Ptr, outputPtr);
+    return NOT_SUPPORT;
+  }
 
   int inpBytes = input->getType().bytes();
   int outBytes = output->getType().bytes();
