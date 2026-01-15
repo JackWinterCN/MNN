@@ -362,4 +362,16 @@ table MyCustomOpParam {
     opType:MyCustomOpType;
     offset:int;
     dataType:DataType=DT_FLOAT;
+}
+
+enum MyCustomUnaryFuncType : int {
+    M_UNARY_SQUARE = 0,
+    M_UNARY_POW = 1,
+    M_UNARY_ABS = 2,
+}
+
+table MyCustomUnaryOpParam {
+    funcType:MyCustomUnaryFuncType;
+    operand:int;
+    dataType:DataType=DT_FLOAT;
 }

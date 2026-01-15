@@ -44,7 +44,7 @@ REGISTER_RUNTIME_CREATOR(XPURuntime, MNNForwardType::MNN_FORWARD_XPU)
 
 
 XPUBackend::XPUBackend(const XPURuntime *runtime) : Backend(MNN_FORWARD_XPU) {
-  MNN_PRINT("[XPU] XPUBackend().\n");
+  MNN_PRINT("[XPU] XPUBackend(), this: %p\n", this);
   mRuntime = runtime;
   mPrecision = mRuntime->mPrecision;
 
@@ -52,12 +52,13 @@ XPUBackend::XPUBackend(const XPURuntime *runtime) : Backend(MNN_FORWARD_XPU) {
 }
 XPUBackend::~XPUBackend() {
   mExecutionBufferPool->clear();
+  MNN_PRINT("[XPU] XPUBackend::~XPUBackend(), this: %p.\n", this);
 }
 
 Execution *XPUBackend::onCreate(const std::vector<Tensor *> &inputs,
                                 const std::vector<Tensor *> &outputs,
                                 const MNN::Op *op) {
-  MNN_PRINT("[XPU] XPUBackend::onCreate().\n");
+  MNN_PRINT("[XPU] XPUBackend::onCreate(), this: %p.\n", this);
   auto iter = mOpCreatorsMap.find(op->type());
 
   if (iter == mOpCreatorsMap.end()) {
@@ -78,25 +79,26 @@ Execution *XPUBackend::onCreate(const std::vector<Tensor *> &inputs,
 }
 
 void XPUBackend::XPUBackend::onExecuteBegin() const {
-  MNN_PRINT("[XPU] XPUBackend::onExecuteBegin().\n");
+  MNN_PRINT("[XPU] XPUBackend::onExecuteBegin(), this: %p.\n", this);
 }
 
 void XPUBackend::onExecuteEnd() const {
-  MNN_PRINT("[XPU] XPUBackend::onExecuteEnd().\n");
+  MNN_PRINT("[XPU] XPUBackend::onExecuteEnd(), this: %p.\n", this);
 }
 
 void XPUBackend::onResizeBegin() {
-    MNN_PRINT("[XPU] XPUBackend::onResizeBegin().\n");
+    MNN_PRINT("[XPU] XPUBackend::onResizeBegin(), this: %p.\n", this);
 }
 
 ErrorCode XPUBackend::onResizeEnd() {
-  MNN_PRINT("[XPU] XPUBackend::onResizeEnd().\n");
+  MNN_PRINT("[XPU] XPUBackend::onResizeEnd(), this: %p.\n", this);
   return NO_ERROR;
 }
 
 Backend::MemObj *XPUBackend::onAcquire(const Tensor *tensor,
                                        StorageType storageType) {
-  MNN_PRINT("[XPU] XPUBackend::onAcquire().\n");
+  MNN_PRINT("[XPU] XPUBackend::onAcquire(), storageType: %d, this: %p.\n",
+            storageType, this);
 
   auto tensorShape = XPU::tensorShapeFormat(tensor);
   int N = tensorShape.at(0);
@@ -123,7 +125,7 @@ Backend::MemObj *XPUBackend::onAcquire(const Tensor *tensor,
   }
   size = ROUND_UP(size, 2);
   MNN_PRINT("size: %ld\n", size);
-  if (storageType != STATIC) {
+  if (storageType != STATIC && storageType != DYNAMIC) {
     MNN_ERROR("not support storageType %d\n", storageType);
     return nullptr;
   }
@@ -133,7 +135,7 @@ Backend::MemObj *XPUBackend::onAcquire(const Tensor *tensor,
 }
 
 bool XPUBackend::onClearBuffer() {
-  MNN_PRINT("[XPU] XPUBackend::onClearBuffer().\n");
+  MNN_PRINT("[XPU] XPUBackend::onClearBuffer(), this: %p.\n", this);
   return true;
 }
 
@@ -256,7 +258,7 @@ void XPUBackend::copyToDevice(const Tensor* srcTensor, const Tensor* dstTensor) 
 
 void XPUBackend::onCopyBuffer(const Tensor *srcTensor,
                               const Tensor *dstTensor) const {
-  MNN_PRINT("[XPU] XPUBackend::onCopyBuffer().\n");
+  MNN_PRINT("[XPU] XPUBackend::onCopyBuffer(), this: %p.\n", this);
   if (srcTensor->host<float>() == nullptr) {
     MNN_PRINT("srcTensor host: null\n");
   }

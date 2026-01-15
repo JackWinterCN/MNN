@@ -16,36 +16,52 @@ std::shared_ptr<XPUMemNode> XPUMemPool::alloc(size_t size, bool separate) {
     if (iter != mFreeList.end()) {
       auto node = iter->second;
       mFreeList.erase(iter);
+      MNN_PRINT("[XPU] XPUMemPool reuse addr: 0x%lx size: %lu\n",
+                node->physical_addr, node->size);
       return node;
-    } else if (mFreeList.size() != 0) {
+    }
+    // TODO: this branch may lead to dangling pointer, because the node in
+    // FreeLists may be used by other operator, and the following code will free
+    // the memory of the node, which may cause dangling pointer.
+    else if (mFreeList.size() != 0) {
       auto maxIter = mFreeList.rbegin();
       auto node = maxIter->second;
-      mTotalSize += size - node.get()->size;
-      node.get()->size = size;
+      // free old memory
+      if (node->physical_addr) {
+        MNN_PRINT("[XPU] XPUMemPool free addr: 0x%lx size: %lu\n",
+                  node->physical_addr, node->size);
+        delete[] (int8_t *)node->physical_addr;
+        node->physical_addr = 0;
+        mTotalSize -= node->size;
+        node->size = 0;
+      }
+      // allocate new memory
       auto p = new int8_t[size];
       if (nullptr == p) {
         MNN_ERROR("Alloc Buffer %lu error\n", size);
         return nullptr;
       }
-      node.get()->physical_addr = (uint64_t)(p);
+      node->size = size;
+      node->physical_addr = (uint64_t)(p);
+      mTotalSize += size;
       mFreeList.erase(std::prev(mFreeList.end()));
       MNN_PRINT("[XPU] XPUMemPool alloc addr: 0x%lx size: %lu\n",
-                node.get()->physical_addr, size);
+                node->physical_addr, size);
       return node;
     }
   }
   std::shared_ptr<XPUMemNode> node(new XPUMemNode);
-  mTotalSize += size;
-  node->size = size;
   auto p = new int8_t[size];
   if (nullptr == p) {
     MNN_ERROR("Alloc Buffer %lu error\n", size);
     return nullptr;
   }
-  node.get()->physical_addr = (uint64_t)(p);
+  node->size = size;
+  node->physical_addr = (uint64_t)(p);
+  mTotalSize += size;
   mAllBuffer.insert(node);
   MNN_PRINT("[XPU] XPUMemPool alloc addr: 0x%lx size: %lu\n",
-            node.get()->physical_addr, size);
+            node->physical_addr, size);
   return node;
 }
 
@@ -56,10 +72,14 @@ void XPUMemPool::recycle(std::shared_ptr<XPUMemNode> node, bool release) {
     return;
   }
   if (release) {
+    MNN_PRINT("[XPU] XPUMemPool recycle RELEASE addr: 0x%lx size: %lu\n",
+              node->physical_addr, node->size);
     mAllBuffer.erase(node);
     return;
   }
-  mFreeList.insert(std::make_pair(node.get()->size, node));
+  MNN_PRINT("[XPU] XPUMemPool recycle addr: 0x%lx size: %lu\n",
+            node->physical_addr, node->size);
+  mFreeList.insert(std::make_pair(node->size, node));
 }
 
 void XPUMemPool::clear() {

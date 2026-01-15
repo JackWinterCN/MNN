@@ -290,11 +290,12 @@ enum OpType {
   OpType_LayerNorm = 603,
   OpType_GridSample = 604,
   OpType_MyCustomOp = 700,
+  OpType_MyCustomUnary = 701,
   OpType_MIN = OpType_AbsVal,
-  OpType_MAX = OpType_MyCustomOp
+  OpType_MAX = OpType_MyCustomUnary
 };
 
-inline const OpType (&EnumValuesOpType())[184] {
+inline const OpType (&EnumValuesOpType())[185] {
   static const OpType values[] = {
     OpType_AbsVal,
     OpType_QuantizedAdd,
@@ -479,7 +480,8 @@ inline const OpType (&EnumValuesOpType())[184] {
     OpType_If,
     OpType_LayerNorm,
     OpType_GridSample,
-    OpType_MyCustomOp
+    OpType_MyCustomOp,
+    OpType_MyCustomUnary
   };
   return values;
 }
@@ -1187,13 +1189,14 @@ inline const char * const *EnumNamesOpType() {
     "",
     "",
     "MyCustomOp",
+    "MyCustomUnary",
     nullptr
   };
   return names;
 }
 
 inline const char *EnumNameOpType(OpType e) {
-  if (e < OpType_AbsVal || e > OpType_MyCustomOp) return "";
+  if (e < OpType_AbsVal || e > OpType_MyCustomUnary) return "";
   const size_t index = static_cast<int>(e);
   return EnumNamesOpType()[index];
 }
@@ -1300,11 +1303,12 @@ enum OpParameter {
   OpParameter_AttentionParam = 98,
   OpParameter_StftParam = 99,
   OpParameter_MyCustomOpParam = 100,
+  OpParameter_MyCustomUnaryOpParam = 101,
   OpParameter_MIN = OpParameter_NONE,
-  OpParameter_MAX = OpParameter_MyCustomOpParam
+  OpParameter_MAX = OpParameter_MyCustomUnaryOpParam
 };
 
-inline const OpParameter (&EnumValuesOpParameter())[101] {
+inline const OpParameter (&EnumValuesOpParameter())[102] {
   static const OpParameter values[] = {
     OpParameter_NONE,
     OpParameter_QuantizedAdd,
@@ -1406,7 +1410,8 @@ inline const OpParameter (&EnumValuesOpParameter())[101] {
     OpParameter_FmhcaParam,
     OpParameter_AttentionParam,
     OpParameter_StftParam,
-    OpParameter_MyCustomOpParam
+    OpParameter_MyCustomOpParam,
+    OpParameter_MyCustomUnaryOpParam
   };
   return values;
 }
@@ -1514,13 +1519,14 @@ inline const char * const *EnumNamesOpParameter() {
     "AttentionParam",
     "StftParam",
     "MyCustomOpParam",
+    "MyCustomUnaryOpParam",
     nullptr
   };
   return names;
 }
 
 inline const char *EnumNameOpParameter(OpParameter e) {
-  if (e < OpParameter_NONE || e > OpParameter_MyCustomOpParam) return "";
+  if (e < OpParameter_NONE || e > OpParameter_MyCustomUnaryOpParam) return "";
   const size_t index = static_cast<int>(e);
   return EnumNamesOpParameter()[index];
 }
@@ -1927,6 +1933,10 @@ template<> struct OpParameterTraits<StftParam> {
 
 template<> struct OpParameterTraits<MyCustomOpParam> {
   static const OpParameter enum_value = OpParameter_MyCustomOpParam;
+};
+
+template<> struct OpParameterTraits<MyCustomUnaryOpParam> {
+  static const OpParameter enum_value = OpParameter_MyCustomUnaryOpParam;
 };
 
 struct OpParameterUnion {
@@ -2759,6 +2769,14 @@ struct OpParameterUnion {
   const MyCustomOpParamT *AsMyCustomOpParam() const {
     return type == OpParameter_MyCustomOpParam ?
       reinterpret_cast<const MyCustomOpParamT *>(value) : nullptr;
+  }
+  MyCustomUnaryOpParamT *AsMyCustomUnaryOpParam() {
+    return type == OpParameter_MyCustomUnaryOpParam ?
+      reinterpret_cast<MyCustomUnaryOpParamT *>(value) : nullptr;
+  }
+  const MyCustomUnaryOpParamT *AsMyCustomUnaryOpParam() const {
+    return type == OpParameter_MyCustomUnaryOpParam ?
+      reinterpret_cast<const MyCustomUnaryOpParamT *>(value) : nullptr;
   }
 };
 
@@ -4089,6 +4107,9 @@ struct Op FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   const MyCustomOpParam *main_as_MyCustomOpParam() const {
     return main_type() == OpParameter_MyCustomOpParam ? static_cast<const MyCustomOpParam *>(main()) : nullptr;
   }
+  const MyCustomUnaryOpParam *main_as_MyCustomUnaryOpParam() const {
+    return main_type() == OpParameter_MyCustomUnaryOpParam ? static_cast<const MyCustomUnaryOpParam *>(main()) : nullptr;
+  }
   const flatbuffers::String *name() const {
     return GetPointer<const flatbuffers::String *>(10);
   }
@@ -4524,6 +4545,10 @@ template<> inline const StftParam *Op::main_as<StftParam>() const {
 
 template<> inline const MyCustomOpParam *Op::main_as<MyCustomOpParam>() const {
   return main_as_MyCustomOpParam();
+}
+
+template<> inline const MyCustomUnaryOpParam *Op::main_as<MyCustomUnaryOpParam>() const {
+  return main_as_MyCustomUnaryOpParam();
 }
 
 struct OpBuilder {
@@ -6289,6 +6314,10 @@ inline bool VerifyOpParameter(flatbuffers::Verifier &verifier, const void *obj, 
       auto ptr = reinterpret_cast<const MyCustomOpParam *>(obj);
       return verifier.VerifyTable(ptr);
     }
+    case OpParameter_MyCustomUnaryOpParam: {
+      auto ptr = reinterpret_cast<const MyCustomUnaryOpParam *>(obj);
+      return verifier.VerifyTable(ptr);
+    }
     default: return false;
   }
 }
@@ -6707,6 +6736,10 @@ inline void *OpParameterUnion::UnPack(const void *obj, OpParameter type, const f
       auto ptr = reinterpret_cast<const MyCustomOpParam *>(obj);
       return ptr->UnPack(resolver);
     }
+    case OpParameter_MyCustomUnaryOpParam: {
+      auto ptr = reinterpret_cast<const MyCustomUnaryOpParam *>(obj);
+      return ptr->UnPack(resolver);
+    }
     default: return nullptr;
   }
 }
@@ -7113,6 +7146,10 @@ inline flatbuffers::Offset<void> OpParameterUnion::Pack(flatbuffers::FlatBufferB
       auto ptr = reinterpret_cast<const MyCustomOpParamT *>(value);
       return CreateMyCustomOpParam(_fbb, ptr, _rehasher).Union();
     }
+    case OpParameter_MyCustomUnaryOpParam: {
+      auto ptr = reinterpret_cast<const MyCustomUnaryOpParamT *>(value);
+      return CreateMyCustomUnaryOpParam(_fbb, ptr, _rehasher).Union();
+    }
     default: return 0;
   }
 }
@@ -7517,6 +7554,10 @@ inline OpParameterUnion::OpParameterUnion(const OpParameterUnion &u) FLATBUFFERS
     }
     case OpParameter_MyCustomOpParam: {
       value = new MyCustomOpParamT(*reinterpret_cast<MyCustomOpParamT *>(u.value));
+      break;
+    }
+    case OpParameter_MyCustomUnaryOpParam: {
+      value = new MyCustomUnaryOpParamT(*reinterpret_cast<MyCustomUnaryOpParamT *>(u.value));
       break;
     }
     default:
@@ -8026,6 +8067,11 @@ inline void OpParameterUnion::Reset() {
       delete ptr;
       break;
     }
+    case OpParameter_MyCustomUnaryOpParam: {
+      auto ptr = reinterpret_cast<MyCustomUnaryOpParamT *>(value);
+      delete ptr;
+      break;
+    }
     default: break;
   }
   value = nullptr;
@@ -8217,12 +8263,13 @@ inline const flatbuffers::TypeTable *OpTypeTypeTable() {
     { flatbuffers::ET_INT, 0, 0 },
     { flatbuffers::ET_INT, 0, 0 },
     { flatbuffers::ET_INT, 0, 0 },
+    { flatbuffers::ET_INT, 0, 0 },
     { flatbuffers::ET_INT, 0, 0 }
   };
   static const flatbuffers::TypeFunction type_refs[] = {
     OpTypeTypeTable
   };
-  static const int64_t values[] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 256, 257, 258, 259, 260, 261, 262, 263, 264, 265, 266, 267, 268, 269, 299, 300, 301, 302, 303, 304, 512, 513, 514, 515, 516, 517, 518, 600, 601, 603, 604, 700 };
+  static const int64_t values[] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 256, 257, 258, 259, 260, 261, 262, 263, 264, 265, 266, 267, 268, 269, 299, 300, 301, 302, 303, 304, 512, 513, 514, 515, 516, 517, 518, 600, 601, 603, 604, 700, 701 };
   static const char * const names[] = {
     "AbsVal",
     "QuantizedAdd",
@@ -8407,10 +8454,11 @@ inline const flatbuffers::TypeTable *OpTypeTypeTable() {
     "If",
     "LayerNorm",
     "GridSample",
-    "MyCustomOp"
+    "MyCustomOp",
+    "MyCustomUnary"
   };
   static const flatbuffers::TypeTable tt = {
-    flatbuffers::ST_ENUM, 184, type_codes, type_refs, values, names
+    flatbuffers::ST_ENUM, 185, type_codes, type_refs, values, names
   };
   return &tt;
 }
@@ -8517,7 +8565,8 @@ inline const flatbuffers::TypeTable *OpParameterTypeTable() {
     { flatbuffers::ET_SEQUENCE, 0, 96 },
     { flatbuffers::ET_SEQUENCE, 0, 97 },
     { flatbuffers::ET_SEQUENCE, 0, 98 },
-    { flatbuffers::ET_SEQUENCE, 0, 99 }
+    { flatbuffers::ET_SEQUENCE, 0, 99 },
+    { flatbuffers::ET_SEQUENCE, 0, 100 }
   };
   static const flatbuffers::TypeFunction type_refs[] = {
     QuantizedAddTypeTable,
@@ -8619,7 +8668,8 @@ inline const flatbuffers::TypeTable *OpParameterTypeTable() {
     FmhcaParamTypeTable,
     AttentionParamTypeTable,
     StftParamTypeTable,
-    MyCustomOpParamTypeTable
+    MyCustomOpParamTypeTable,
+    MyCustomUnaryOpParamTypeTable
   };
   static const char * const names[] = {
     "NONE",
@@ -8722,10 +8772,11 @@ inline const flatbuffers::TypeTable *OpParameterTypeTable() {
     "FmhcaParam",
     "AttentionParam",
     "StftParam",
-    "MyCustomOpParam"
+    "MyCustomOpParam",
+    "MyCustomUnaryOpParam"
   };
   static const flatbuffers::TypeTable tt = {
-    flatbuffers::ST_UNION, 101, type_codes, type_refs, nullptr, names
+    flatbuffers::ST_UNION, 102, type_codes, type_refs, nullptr, names
   };
   return &tt;
 }

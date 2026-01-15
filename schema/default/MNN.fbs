@@ -209,7 +209,8 @@ enum OpType : int {
     LayerNorm = 603,
     GridSample = 604,
 
-    MyCustomOp = 700
+    MyCustomOp = 700,
+    MyCustomUnary = 701
 }
 
 table Plugin {
@@ -425,7 +426,8 @@ union OpParameter {
     FmhcaParam,
     AttentionParam,
     StftParam,
-    MyCustomOpParam
+    MyCustomOpParam,
+    MyCustomUnaryOpParam
 }
 
 table Op {

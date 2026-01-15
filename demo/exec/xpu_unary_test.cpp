@@ -13,23 +13,20 @@ using namespace MNN;
 using namespace MNN::Express;
 
 int main(int argc, char *argv[]) {
-  MNN_PRINT("run xpu_test.out\n");
   if (argc < 3) {
-    std::cout << "Usage: ./xpu_test.out model.mnn len1 len2 forwardType"
+    std::cout << "Usage: ./xpu_unary_test.out model.mnn len forwardType"
               << std::endl;
     return -1;
   }
 
   const auto modelFile = argv[1];
-  const auto len1_str = argv[2];
-  const auto len2_str = argv[3];
-  const int len1 = std::stoi(len1_str);
-  const int len2 = std::stoi(len2_str);
+  const auto len_str = argv[2];
+  const int len1 = std::stoi(len_str);
   int thread = 4;
   int precision = BackendConfig::Precision_High;
   int forwardType = MNN_FORWARD_CPU;
-  if (argc > 4) {
-    forwardType = std::stoi(argv[4]);
+  if (argc > 3) {
+    forwardType = std::stoi(argv[3]);
   }
 
   MNN::ScheduleConfig sConfig;
@@ -52,19 +49,12 @@ int main(int argc, char *argv[]) {
   VARP X = _Input({1, 1, 1, len1}, NCHW);
   auto X_ptr = X->writeMap<float>();
   for (int i = 0; i < len1; i++) {
-    X_ptr[i] = i;
+    X_ptr[i] = i + 1;
     printf("X_ptr[%d] = %f\t", i, X_ptr[i]);
   }
   printf("\n");
-  VARP Y = _Input({1, 1, 1, len2}, NCHW);
-  auto Y_ptr = Y->writeMap<float>();
-  for (int i = 0; i < len2; i++) {
-    Y_ptr[i] = i + 1;
-    printf("Y_ptr[%d] = %f\t", i, Y_ptr[i]);
-  }
-  printf("\n");
 
-  auto Z = net->onForward({X, Y});
+  auto Z = net->onForward({X});
   if (Z.empty()) {
     MNN_ERROR("Z is empty\n");
     return 0;

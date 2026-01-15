@@ -130,6 +130,9 @@ struct LSTMBlockCellT;
 struct MyCustomOpParam;
 struct MyCustomOpParamT;
 
+struct MyCustomUnaryOpParam;
+struct MyCustomUnaryOpParamT;
+
 inline const flatbuffers::TypeTable *BinaryOpTypeTable();
 
 inline const flatbuffers::TypeTable *PackParamTypeTable();
@@ -209,6 +212,8 @@ inline const flatbuffers::TypeTable *TensorArrayTypeTable();
 inline const flatbuffers::TypeTable *LSTMBlockCellTypeTable();
 
 inline const flatbuffers::TypeTable *MyCustomOpParamTypeTable();
+
+inline const flatbuffers::TypeTable *MyCustomUnaryOpParamTypeTable();
 
 enum BinaryOpOperation {
   BinaryOpOperation_ADD = 0,
@@ -629,6 +634,39 @@ inline const char *EnumNameMyCustomOpType(MyCustomOpType e) {
   if (e < MyCustomOpType_M_ADD || e > MyCustomOpType_M_DIV) return "";
   const size_t index = static_cast<int>(e);
   return EnumNamesMyCustomOpType()[index];
+}
+
+enum MyCustomUnaryFuncType {
+  MyCustomUnaryFuncType_M_UNARY_SQUARE = 0,
+  MyCustomUnaryFuncType_M_UNARY_POW = 1,
+  MyCustomUnaryFuncType_M_UNARY_ABS = 2,
+  MyCustomUnaryFuncType_MIN = MyCustomUnaryFuncType_M_UNARY_SQUARE,
+  MyCustomUnaryFuncType_MAX = MyCustomUnaryFuncType_M_UNARY_ABS
+};
+
+inline const MyCustomUnaryFuncType (&EnumValuesMyCustomUnaryFuncType())[3] {
+  static const MyCustomUnaryFuncType values[] = {
+    MyCustomUnaryFuncType_M_UNARY_SQUARE,
+    MyCustomUnaryFuncType_M_UNARY_POW,
+    MyCustomUnaryFuncType_M_UNARY_ABS
+  };
+  return values;
+}
+
+inline const char * const *EnumNamesMyCustomUnaryFuncType() {
+  static const char * const names[] = {
+    "M_UNARY_SQUARE",
+    "M_UNARY_POW",
+    "M_UNARY_ABS",
+    nullptr
+  };
+  return names;
+}
+
+inline const char *EnumNameMyCustomUnaryFuncType(MyCustomUnaryFuncType e) {
+  if (e < MyCustomUnaryFuncType_M_UNARY_SQUARE || e > MyCustomUnaryFuncType_M_UNARY_ABS) return "";
+  const size_t index = static_cast<int>(e);
+  return EnumNamesMyCustomUnaryFuncType()[index];
 }
 
 struct BinaryOpT : public flatbuffers::NativeTable {
@@ -3770,6 +3808,82 @@ inline flatbuffers::Offset<MyCustomOpParam> CreateMyCustomOpParam(
 
 flatbuffers::Offset<MyCustomOpParam> CreateMyCustomOpParam(flatbuffers::FlatBufferBuilder &_fbb, const MyCustomOpParamT *_o, const flatbuffers::rehasher_function_t *_rehasher = nullptr);
 
+struct MyCustomUnaryOpParamT : public flatbuffers::NativeTable {
+  typedef MyCustomUnaryOpParam TableType;
+  MyCustomUnaryFuncType funcType;
+  int32_t operand;
+  DataType dataType;
+  MyCustomUnaryOpParamT()
+      : funcType(MyCustomUnaryFuncType_M_UNARY_SQUARE),
+        operand(0),
+        dataType(DataType_DT_FLOAT) {
+  }
+};
+
+struct MyCustomUnaryOpParam FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
+  typedef MyCustomUnaryOpParamT NativeTableType;
+  static const flatbuffers::TypeTable *MiniReflectTypeTable() {
+    return MyCustomUnaryOpParamTypeTable();
+  }
+  MyCustomUnaryFuncType funcType() const {
+    return static_cast<MyCustomUnaryFuncType>(GetField<int32_t>(4, 0));
+  }
+  int32_t operand() const {
+    return GetField<int32_t>(6, 0);
+  }
+  DataType dataType() const {
+    return static_cast<DataType>(GetField<int32_t>(8, 1));
+  }
+  bool Verify(flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<int32_t>(verifier, 4) &&
+           VerifyField<int32_t>(verifier, 6) &&
+           VerifyField<int32_t>(verifier, 8) &&
+           verifier.EndTable();
+  }
+  MyCustomUnaryOpParamT *UnPack(const flatbuffers::resolver_function_t *_resolver = nullptr) const;
+  void UnPackTo(MyCustomUnaryOpParamT *_o, const flatbuffers::resolver_function_t *_resolver = nullptr) const;
+  static flatbuffers::Offset<MyCustomUnaryOpParam> Pack(flatbuffers::FlatBufferBuilder &_fbb, const MyCustomUnaryOpParamT* _o, const flatbuffers::rehasher_function_t *_rehasher = nullptr);
+};
+
+struct MyCustomUnaryOpParamBuilder {
+  flatbuffers::FlatBufferBuilder &fbb_;
+  flatbuffers::uoffset_t start_;
+  void add_funcType(MyCustomUnaryFuncType funcType) {
+    fbb_.AddElement<int32_t>(4, static_cast<int32_t>(funcType), 0);
+  }
+  void add_operand(int32_t operand) {
+    fbb_.AddElement<int32_t>(6, operand, 0);
+  }
+  void add_dataType(DataType dataType) {
+    fbb_.AddElement<int32_t>(8, static_cast<int32_t>(dataType), 1);
+  }
+  explicit MyCustomUnaryOpParamBuilder(flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  MyCustomUnaryOpParamBuilder &operator=(const MyCustomUnaryOpParamBuilder &);
+  flatbuffers::Offset<MyCustomUnaryOpParam> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = flatbuffers::Offset<MyCustomUnaryOpParam>(end);
+    return o;
+  }
+};
+
+inline flatbuffers::Offset<MyCustomUnaryOpParam> CreateMyCustomUnaryOpParam(
+    flatbuffers::FlatBufferBuilder &_fbb,
+    MyCustomUnaryFuncType funcType = MyCustomUnaryFuncType_M_UNARY_SQUARE,
+    int32_t operand = 0,
+    DataType dataType = DataType_DT_FLOAT) {
+  MyCustomUnaryOpParamBuilder builder_(_fbb);
+  builder_.add_dataType(dataType);
+  builder_.add_operand(operand);
+  builder_.add_funcType(funcType);
+  return builder_.Finish();
+}
+
+flatbuffers::Offset<MyCustomUnaryOpParam> CreateMyCustomUnaryOpParam(flatbuffers::FlatBufferBuilder &_fbb, const MyCustomUnaryOpParamT *_o, const flatbuffers::rehasher_function_t *_rehasher = nullptr);
+
 inline BinaryOpT *BinaryOp::UnPack(const flatbuffers::resolver_function_t *_resolver) const {
   auto _o = new BinaryOpT();
   UnPackTo(_o, _resolver);
@@ -5077,6 +5191,38 @@ inline flatbuffers::Offset<MyCustomOpParam> CreateMyCustomOpParam(flatbuffers::F
       _dataType);
 }
 
+inline MyCustomUnaryOpParamT *MyCustomUnaryOpParam::UnPack(const flatbuffers::resolver_function_t *_resolver) const {
+  auto _o = new MyCustomUnaryOpParamT();
+  UnPackTo(_o, _resolver);
+  return _o;
+}
+
+inline void MyCustomUnaryOpParam::UnPackTo(MyCustomUnaryOpParamT *_o, const flatbuffers::resolver_function_t *_resolver) const {
+  (void)_o;
+  (void)_resolver;
+  { auto _e = funcType(); _o->funcType = _e; };
+  { auto _e = operand(); _o->operand = _e; };
+  { auto _e = dataType(); _o->dataType = _e; };
+}
+
+inline flatbuffers::Offset<MyCustomUnaryOpParam> MyCustomUnaryOpParam::Pack(flatbuffers::FlatBufferBuilder &_fbb, const MyCustomUnaryOpParamT* _o, const flatbuffers::rehasher_function_t *_rehasher) {
+  return CreateMyCustomUnaryOpParam(_fbb, _o, _rehasher);
+}
+
+inline flatbuffers::Offset<MyCustomUnaryOpParam> CreateMyCustomUnaryOpParam(flatbuffers::FlatBufferBuilder &_fbb, const MyCustomUnaryOpParamT *_o, const flatbuffers::rehasher_function_t *_rehasher) {
+  (void)_rehasher;
+  (void)_o;
+  struct _VectorArgs { flatbuffers::FlatBufferBuilder *__fbb; const MyCustomUnaryOpParamT* __o; const flatbuffers::rehasher_function_t *__rehasher; } _va = { &_fbb, _o, _rehasher}; (void)_va;
+  auto _funcType = _o->funcType;
+  auto _operand = _o->operand;
+  auto _dataType = _o->dataType;
+  return MNN::CreateMyCustomUnaryOpParam(
+      _fbb,
+      _funcType,
+      _operand,
+      _dataType);
+}
+
 inline const flatbuffers::TypeTable *BinaryOpOperationTypeTable() {
   static const flatbuffers::TypeCode type_codes[] = {
     { flatbuffers::ET_CHAR, 0, 0 },
@@ -5340,6 +5486,26 @@ inline const flatbuffers::TypeTable *MyCustomOpTypeTypeTable() {
   };
   static const flatbuffers::TypeTable tt = {
     flatbuffers::ST_ENUM, 4, type_codes, type_refs, nullptr, names
+  };
+  return &tt;
+}
+
+inline const flatbuffers::TypeTable *MyCustomUnaryFuncTypeTypeTable() {
+  static const flatbuffers::TypeCode type_codes[] = {
+    { flatbuffers::ET_INT, 0, 0 },
+    { flatbuffers::ET_INT, 0, 0 },
+    { flatbuffers::ET_INT, 0, 0 }
+  };
+  static const flatbuffers::TypeFunction type_refs[] = {
+    MyCustomUnaryFuncTypeTypeTable
+  };
+  static const char * const names[] = {
+    "M_UNARY_SQUARE",
+    "M_UNARY_POW",
+    "M_UNARY_ABS"
+  };
+  static const flatbuffers::TypeTable tt = {
+    flatbuffers::ST_ENUM, 3, type_codes, type_refs, nullptr, names
   };
   return &tt;
 }
@@ -6106,6 +6272,27 @@ inline const flatbuffers::TypeTable *MyCustomOpParamTypeTable() {
   static const char * const names[] = {
     "opType",
     "offset",
+    "dataType"
+  };
+  static const flatbuffers::TypeTable tt = {
+    flatbuffers::ST_TABLE, 3, type_codes, type_refs, nullptr, names
+  };
+  return &tt;
+}
+
+inline const flatbuffers::TypeTable *MyCustomUnaryOpParamTypeTable() {
+  static const flatbuffers::TypeCode type_codes[] = {
+    { flatbuffers::ET_INT, 0, 0 },
+    { flatbuffers::ET_INT, 0, -1 },
+    { flatbuffers::ET_INT, 0, 1 }
+  };
+  static const flatbuffers::TypeFunction type_refs[] = {
+    MyCustomUnaryFuncTypeTypeTable,
+    DataTypeTypeTable
+  };
+  static const char * const names[] = {
+    "funcType",
+    "operand",
     "dataType"
   };
   static const flatbuffers::TypeTable tt = {

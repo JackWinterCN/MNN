@@ -342,10 +342,10 @@ void printData(const Tensor* tensor, const void* data, const char* fmt) {
 }
 void Tensor::print() const {
     // print dimensions
-    MNN_PRINT("====== Tensor %p ======", this);
-    MNN_PRINT("\nDimension: ");
+    MNN_PRINT("====== Tensor %p ======\n", this);
+    MNN_PRINT("Dimension: \n");
     for (int i = 0; i < mBuffer.dimensions; i++) {
-        MNN_PRINT("%d, ", mBuffer.dim[i].extent);
+        MNN_PRINT("%d\n", mBuffer.dim[i].extent);
     }
 
     // convert to host if needed
@@ -360,26 +360,26 @@ void Tensor::print() const {
     }
     auto buffer = printee->buffer().host;
 
-    MNN_PRINT("\nData: ");
+    MNN_PRINT("Data: \n");
     if (printee->getType().code == halide_type_int) {
         if (printee->getType().bits == 8) { // int8
-            printData<int8_t>(printee, buffer, "%d, ");
+            printData<int8_t>(printee, buffer, "%d\n");
         } else if (printee->getType().bits == 16) { // int16
-            printData<int16_t>(printee, buffer, "%d, ");
+            printData<int16_t>(printee, buffer, "%d\n");
         } else if (printee->getType().bits == 32) { // int32
-            printData<int32_t>(printee, buffer, "%d, ");
+            printData<int32_t>(printee, buffer, "%d\n");
         } else {
             MNN_PRINT("\nunsupported data type");
         }
     } else if (printee->getType().code == halide_type_uint) {
         if (printee->getType().bits == 8) { // uint8
-            printData<uint8_t>(printee, buffer, "%d, ");
+            printData<uint8_t>(printee, buffer, "%d\n");
         } else {
             MNN_PRINT("\nunsupported data type");
         }
     } else if (printee->getType().code == halide_type_float) {
         if (printee->getType().bits == 32) { // float32
-            printData<float>(printee, buffer, "%f, ");
+            printData<float>(printee, buffer, "%f\n");
         } else {
             MNN_PRINT("\nunsupported data type\n");
         }
