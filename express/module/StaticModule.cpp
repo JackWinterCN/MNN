@@ -384,6 +384,7 @@ StaticModule::StaticModule(std::vector<int> inputs,
     }
 }
 StaticModule::~StaticModule() {
+    mResource.reset();
     mSession         = nullptr;
 }
 void StaticModule::onClearCache() {

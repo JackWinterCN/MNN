@@ -11,6 +11,7 @@ public:
   virtual bool
   onComputeSize(const Op *op, const std::vector<Tensor *> &inputs,
                 const std::vector<Tensor *> &outputs) const override {
+    MNN_PRINT("MyCustomOpSizeComputer onComputeSize()\n");
     MNN_ASSERT(2 == inputs.size());
     MNN_ASSERT(1 == outputs.size());
     // set output type & format

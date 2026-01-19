@@ -360,7 +360,7 @@ ErrorCode Pipeline::encode(bool supportDebug, bool permitCodegen) {
             return change;
         };
         for (int i = 0; i < 3 && (propagateScale(forwardMap, forwardStart) || propagateScale(backwardMap, backwardStart)); i++);
-        
+
         // Insert cast
         std::map<const Tensor*, Tensor*> cachedCastTensor;
         for (auto& info : mInfo.second) {
@@ -391,7 +391,7 @@ ErrorCode Pipeline::encode(bool supportDebug, bool permitCodegen) {
                 if (useQuant) {
                     runType = DataType_DT_INT8;
                 }
-                
+
                 for (auto o : outputs) {
                     auto quan = TensorUtils::getDescribe(o)->quantAttr;
                     if (nullptr != quan) {
@@ -1286,11 +1286,11 @@ ErrorCode Pipeline::executeCallBack(const TensorCallBackWithInfo& before, const 
 Pipeline::~Pipeline() {
     auto& bn = mInfo.first.cache.first;
     auto& backupbn = mInfo.first.cache.second;
-    bn->onClearBuffer();
-    backupbn->onClearBuffer();
     mInfo.second.clear();
     mCacheConstTensors.clear();
     mWrapTensors.clear();
+    bn->onClearBuffer();
+    backupbn->onClearBuffer();
 }
 
 } // namespace MNN

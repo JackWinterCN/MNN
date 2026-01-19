@@ -83,6 +83,7 @@ void XPUMemPool::recycle(std::shared_ptr<XPUMemNode> node, bool release) {
 }
 
 void XPUMemPool::clear() {
+  MNN_PRINT("[XPU] XPUMemPool clear\n");
   mFreeList.clear();
   mAllBuffer.clear();
   mTotalSize = 0;

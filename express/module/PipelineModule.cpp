@@ -812,6 +812,7 @@ Module* PipelineModule::load(const std::vector<std::string>& inputs, const std::
     }
     if (preReplaceConstTensor) {
         // Prereplace const tensor
+        MNN_PRINT("-------------------------> Prereplace const tensor start\n");
         auto curBackend = sharedConst->constReplaceBackend.get();
         if (sharedConst->constReplaceBackend->type() != sharedConst->defaultBackend->type()) {
             for (auto& t : sharedConst->allTensors) {
@@ -844,6 +845,7 @@ Module* PipelineModule::load(const std::vector<std::string>& inputs, const std::
         }
         // Clear CPU Const memory
         rt.second->onGabageCollect(0);
+        MNN_PRINT("---------------------------> Prereplace const tensor end\n");
     }
     for (auto index : noneedComputeIndexes) {
         auto tensor = Tensor::clone(sharedConst->allTensors[index].get());

@@ -18,6 +18,8 @@ add_executable(xpu_test.out ${CMAKE_CURRENT_LIST_DIR}/xpu_test.cpp)
 list(APPEND MNN_EXEC_DEMOS xpu_test.out)
 add_executable(xpu_unary_test.out ${CMAKE_CURRENT_LIST_DIR}/xpu_unary_test.cpp)
 list(APPEND MNN_EXEC_DEMOS xpu_unary_test.out)
+add_executable(xpu_yolov5s.out ${CMAKE_CURRENT_LIST_DIR}/xpu_yolov5s.cpp)
+list(APPEND MNN_EXEC_DEMOS xpu_yolov5s.out)
 
 add_executable(pictureRecognition_module.out ${CMAKE_CURRENT_LIST_DIR}/pictureRecognition_module.cpp)
 list(APPEND MNN_EXEC_DEMOS pictureRecognition_module.out)
