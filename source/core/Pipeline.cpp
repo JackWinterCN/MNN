@@ -1183,6 +1183,11 @@ ErrorCode Pipeline::execute() {
     }
     auto& mBackend = mInfo.first.cache.first;
     auto& mBackupBackend = mInfo.first.cache.second;
+// #define MNN_OP_TIME_DEBUG
+#ifdef MNN_OP_TIME_DEBUG
+    std::vector<std::pair<std::string, float>> time_cost;
+    MNN::Timer _t;
+#endif
     for (auto& info : mInfo.second) {
         if (info.type == Schedule::CONSTANT) {
             continue;
@@ -1210,7 +1215,16 @@ ErrorCode Pipeline::execute() {
                 MNN_PRINT("Group: %d, %s - %d, type=%s, inputs: %s, devices: %s - %s\n", info.group, info.op->name()->c_str(), cmdIndex, EnumNameOpType(cmd.op->type()), groupOfInput.c_str(), deviceOfInput.c_str(), deviceOfOutput.c_str());
             }
 #endif
+#ifdef MNN_OP_TIME_DEBUG
+            _t.reset();
+#endif
             auto code = cmd.execution->onExecute(cmd.workInputs, cmd.workOutputs);
+
+#ifdef MNN_OP_TIME_DEBUG
+            time_cost.push_back({std::string(EnumNameOpType(cmd.op->type())) +
+                                     "(" + EnumNameOpType(cmd.op->type()) + ")",
+                                 (float)_t.durationInUs() / 1000.0f});
+#endif
             if (NO_ERROR != code) {
                 _exitExecute();
                 return code;
@@ -1218,6 +1232,12 @@ ErrorCode Pipeline::execute() {
         }
     }
     _exitExecute();
+#ifdef MNN_OP_TIME_DEBUG
+    for (auto& iter : time_cost) {
+      MNN_PRINT("layer: %s, time cost: %f ms\n", iter.first.c_str(),
+                iter.second);
+    }
+#endif
     return NO_ERROR;
 }
 ErrorCode Pipeline::_enterExecute() {

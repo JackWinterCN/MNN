@@ -3,6 +3,7 @@
 #include <MNN/expr/Executor.hpp>
 #include <MNN/expr/ExprCreator.hpp>
 #include <MNN/expr/Module.hpp>
+#include <MNN/AutoTime.hpp>
 
 #include <cv/cv.hpp>
 
@@ -20,6 +21,7 @@ int main(int argc, const char *argv[]) {
   int thread = 4;
   int precision = BackendConfig::Precision_High;
   int forwardType = MNN_FORWARD_CPU;
+  int warmup = 2;
   const auto model_file = argv[1];
   const auto input_file = argv[2];
   if (argc >= 4) {
@@ -63,7 +65,19 @@ int main(int argc, const char *argv[]) {
                  {1. / 255., 1. / 255., 1. / 255.});
   auto input = _Unsqueeze(image, {0});
   input = _Convert(input, NC4HW4);
+  for (int i = 0; i < warmup; i++) {
+    printf("======> net forward warmup start\n");
+    MNN::Timer _t;
+    auto outputs = net->onForward({input});
+    auto time = (float)_t.durationInUs() / 1000.0f;
+    printf("======> net forward time = %f ms\n", time);
+  }
+  printf("======> net forward start\n");
+  MNN::Timer _t;
   auto outputs = net->onForward({input});
+  auto time = (float)_t.durationInUs() / 1000.0f;
+  printf("======> net forward time = %f ms\n", time);
+
   auto output = _Convert(outputs[0], NCHW);
   output = _Squeeze(output);
   // output shape: [25200, 85]; 85 means: [cx, cy, w, h, box_conf, prob * 80]
