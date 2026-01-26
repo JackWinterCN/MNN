@@ -7,11 +7,12 @@
 #include "backend/xpu/execution/XPUTensorConvert.hpp"
 
 namespace MNN {
-
+using namespace XPU;
 std::map<OpType, XPUBackend::OpCreator*> XPUBackend::mOpCreatorsMap;
 
 XPURuntime::XPURuntime(const Backend::Info &info) {
   MNN_PRINT("[XPU] XPURuntime().\n");
+  MNNXPUCoreFunctionInit();
   mInfo = info;
   BackendConfig::PrecisionMode precision = BackendConfig::Precision_Normal;
   BackendConfig::PowerMode power = BackendConfig::Power_Normal;
@@ -49,6 +50,7 @@ XPUBackend::XPUBackend(const XPURuntime *runtime) : Backend(MNN_FORWARD_XPU) {
   mPrecision = mRuntime->mPrecision;
 
   mExecutionBufferPool.reset(new XPU::XPUMemPool);
+  mCoreFunctions = MNNGetXPUCoreFunctions();
 }
 XPUBackend::~XPUBackend() {
   mExecutionBufferPool->clear();
@@ -146,7 +148,7 @@ void XPUBackend::copyFromDevice(const Tensor* srcTensor, const Tensor* dstTensor
     auto dstDimensionFormat = TensorUtils::getDescribe(dstTensor)->dimensionFormat;
     auto memType = dstTensor->buffer().flags;
     bool directCopy = (srcDimensionFormat == dstDimensionFormat || srcTensor->dimensions() <= 1)
-                       && MNN::MNN_DATA_FORMAT_NC4HW4 != dstDimensionFormat && MNN_DATA_FORMAT_NC4HW4 != srcDimensionFormat
+                      //  && MNN::MNN_DATA_FORMAT_NC4HW4 != dstDimensionFormat && MNN_DATA_FORMAT_NC4HW4 != srcDimensionFormat
                        && (XPU::getDataType(srcTensor) == XPU::getDataType(dstTensor));
     if (mPrecision != BackendConfig::Precision_High) { // Fp16
         if (dstTensor->getType().code == halide_type_float) {
@@ -176,7 +178,7 @@ void XPUBackend::copyToDevice(const Tensor* srcTensor, const Tensor* dstTensor) 
     void* hostPtr = srcTensor->host<float>();
 
     bool directCopy = (srcDimensionFormat == dstDimensionFormat || srcTensor->dimensions() <= 1)
-                       && MNN_DATA_FORMAT_NC4HW4 != dstDimensionFormat && MNN_DATA_FORMAT_NC4HW4 != srcDimensionFormat
+                      //  && MNN_DATA_FORMAT_NC4HW4 != dstDimensionFormat && MNN_DATA_FORMAT_NC4HW4 != srcDimensionFormat
                        && (XPU::getDataType(srcTensor) == XPU::getDataType(dstTensor));
     if (mPrecision != BackendConfig::Precision_High) { // Fp16
         if (dstTensor->getType().code == halide_type_float) {

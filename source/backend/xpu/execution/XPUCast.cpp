@@ -9,8 +9,6 @@
 #include "backend/xpu/execution/XPUCast.hpp"
 #include "core/TensorUtils.hpp"
 #include "core/Macro.h"
-#include "backend/cpu/compute/Int8FunctionsOpt.h"
-#include "backend/cpu/compute/CommonOptFunction.h"
 #include <cmath>
 
 namespace MNN {

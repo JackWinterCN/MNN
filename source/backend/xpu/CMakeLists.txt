@@ -4,6 +4,8 @@ file(GLOB MNN_NPU_SRCS
     ${CMAKE_CURRENT_LIST_DIR}/backend/*.hpp
     ${CMAKE_CURRENT_LIST_DIR}/execution/*.cpp
     ${CMAKE_CURRENT_LIST_DIR}/execution/*.hpp
+    ${CMAKE_CURRENT_LIST_DIR}/execution/compute/*.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/execution/compute/*.hpp
 )
 
 add_library(

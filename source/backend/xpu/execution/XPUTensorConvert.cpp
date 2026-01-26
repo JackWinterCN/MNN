@@ -10,11 +10,11 @@
 #include "backend/xpu/backend/XPUBackend.hpp"
 #include "core/Macro.h"
 #include "core/TensorUtils.hpp"
-#include "backend/cpu/compute/CommonOptFunction.h"
-#include "core/Concurrency.h"
+#include "backend/xpu/execution/compute/XPUCommonOptFunction.hpp"
+#include "backend/xpu/execution/compute/Concurrency.h"
 
 namespace MNN {
-
+using namespace XPU;
 template<typename T>
 void NCHW2NHWC(const T* source, T* dest, int b, int c, int area) {
     int sourceBatchsize = c * area;
@@ -54,7 +54,7 @@ ErrorCode XPUTensorConverter::convert(const void *inputRaw, void *outputRaw,
                                       MNN_DATA_FORMAT source,
                                       MNN_DATA_FORMAT dest, int batch, int area,
                                       int channel, int byteNum,
-                                      const CoreFunctions *core, int tId,
+                                      const  XPUCoreFunctions *core, int tId,
                                       int numberThread) {
   // the case when source and dest data layout are the same
   // This case occurs in BackendTest of BF16 data.
@@ -269,7 +269,7 @@ std::tuple<int, int, int> XPUTensorConverter::splitDimensions(const halide_buffe
     return std::make_tuple(batch, area, channel);
 }
 
-static int _getBytes(const CoreFunctions* core, const Tensor* output) {
+static int _getBytes(const  XPUCoreFunctions* core, const Tensor* output) {
     auto bytes = output->getType().bytes();
     auto quant = TensorUtils::getDescribe(output)->quantAttr.get();
     if (output->getType().code == halide_type_float) {
@@ -281,13 +281,13 @@ static int _getBytes(const CoreFunctions* core, const Tensor* output) {
     return bytes;
 }
 
-ErrorCode XPUTensorConverter::convert(const Tensor* input, const Tensor* output, const CoreFunctions* core, int tId, int numberThread) {
+ErrorCode XPUTensorConverter::convert(const Tensor* input, const Tensor* output, const  XPUCoreFunctions* core, int tId, int numberThread) {
     auto ib     = input->buffer();
     auto ob     = output->buffer();
     auto source = TensorUtils::getDescribe(input)->dimensionFormat;
     auto dest   = TensorUtils::getDescribe(output)->dimensionFormat;
     if (nullptr == core) {
-        core = MNNGetCoreFunctions();
+        core = MNNGetXPUCoreFunctions();
     }
     size_t byteNum = _getBytes(core, input);
     if (ib.dimensions <= 1 || source == dest) {

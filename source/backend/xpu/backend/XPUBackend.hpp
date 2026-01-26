@@ -9,6 +9,7 @@
 #include <core/TensorUtils.hpp>
 #include "core/BufferAllocator.hpp"
 #include "MNN_generated.h"
+#include "backend/xpu/execution/compute/XPUCommonOptFunction.hpp"
 
 namespace MNN {
 
@@ -60,6 +61,37 @@ public:
   virtual bool onClearBuffer() override;
   virtual void onCopyBuffer(const Tensor *srcTensor,
                             const Tensor *dstTensor) const override;
+  inline int threadNumber() const {
+    return mThreadNumber;
+  }
+  void computeDivideSizes(int size, int *dst, float avgDiv = 0) const {
+    // if (mGroupWithComputeRate.size() <= 1 ||
+    //     (avgDiv > 0 && avgDiv < mComputeI)) {
+      // Avg divide
+      int length = UP_DIV(size, mThreadNumber);
+      int cur = length;
+      for (int i = 0; i < mThreadNumber; ++i) {
+        dst[i] = cur;
+        cur = cur + length;
+        cur = ALIMIN(cur, size);
+      }
+      return;
+    // }
+
+    // int cur = 0;
+    // int curPos = 0;
+    // for (auto &group : mGroupWithComputeRate) {
+    //   int currentGroupTotal = (int)(ceilf((float)size * group.first));
+    //   int length = UP_DIV(currentGroupTotal, group.second);
+    //   for (int i = 0; i < group.second; ++i) {
+    //     cur = cur + length;
+    //     cur = ALIMIN(cur, size);
+    //     dst[curPos + i] = cur;
+    //   }
+    //   curPos += group.second;
+    // }
+  }
+  const XPU::XPUCoreFunctions *functions() const { return mCoreFunctions; }
   static bool addOpCreator(OpType t, OpCreator *c);
 
 private:
@@ -77,6 +109,9 @@ private:
   const XPURuntime *mRuntime;
   BackendConfig::PrecisionMode mPrecision;
   std::shared_ptr<XPU::XPUMemPool> mExecutionBufferPool;
+  XPU::XPUCoreFunctions *mCoreFunctions;
+  // CoreInt8Functions *mInt8CoreFunctions;
+  int mThreadNumber{1};
 };
 
 template <class T>
