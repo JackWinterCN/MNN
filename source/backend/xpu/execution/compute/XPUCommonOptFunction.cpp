@@ -216,9 +216,381 @@ void MNNTranspose32Bit(int32_t* dstO, const int32_t* srcO, int32_t* dim) {
         }
     }
 }
+#define UNIT 4
+using Vec4 = MNN::Math::Vec<float, 4>;
+
+void MNNReluWithSlopeChannel(float* dst, const float* src, const float* slope, size_t sizeQuad, size_t depthQuad) {
+    for (int j = 0; j < depthQuad; j++) {
+        const float* slopeZ = slope + 4 * j;
+        const float* srcZ   = src + 4 * j * sizeQuad;
+        float* dstZ         = dst + 4 * j * sizeQuad;
+        for (int i = 0; i < sizeQuad; i++) {
+            for (int c = 0; c < 4; c++) {
+                if (srcZ[4 * i + c] < 0) {
+                    dstZ[4 * i + c] = srcZ[4 * i + c] * slopeZ[c];
+                } else {
+                    dstZ[4 * i + c] = srcZ[4 * i + c];
+                }
+            }
+        }
+    }
+}
 
 void MNNPackC4(float* dst, const float* src, size_t area, size_t depth, int* areaOffset) {
     MNNPackC4Common<float>(dst, src, area, depth, areaOffset);
+}
+
+void MNNExpC8(float* dest, const float* source, float* offset, const float* parameters, size_t countC8) {
+    auto count = countC8 * 8;
+    auto param = parameters[0];
+    float xLimit = 87;
+    float summer = offset[3];
+    for (int i = 0; i < count; ++i) {
+        auto x         = source[i] * offset[0] + offset[2];
+        x = ALIMAX(x, -xLimit);
+        x = ALIMIN(x, xLimit);
+        int div        = (x * parameters[1]);
+        int div2       = (div + 127) << 23;
+        auto xReamin   = x - div * param;
+        float expBasic = *(float*)(&div2);
+        auto t = xReamin * 0.25f;
+        auto expRemain =
+        ((((parameters[7] * t + parameters[6]) * t + parameters[5]) * t + parameters[4]) * t + 1.0f) * t +
+            1.0f;
+        expRemain = expRemain * expRemain;
+        expRemain = expRemain * expRemain;
+        dest[i] = expBasic * expRemain + offset[1];
+        summer+= dest[i];
+    }
+    offset[3] = summer;
+}
+void MNNScaleAndAddBias(float* dst, const float* src, const float* bias, const float* alpha, size_t planeNumber,
+                        size_t biasNumber) {
+    for (int z = 0; z < biasNumber; ++z) {
+        float* dstZ         = dst + planeNumber * 4 * z;
+        const float* srcZ   = src + planeNumber * 4 * z;
+        auto biasZ = Vec4::load(bias + 4 * z);
+        auto alphaZ = Vec4::load(alpha + 4 * z);
+        for (int p = 0; p < planeNumber; ++p) {
+            float* dstX       = dstZ + 4 * p;
+            const float* srcX = srcZ + 4 * p;
+            Vec4::save(dstX, (Vec4::load(srcX) * alphaZ) + biasZ);
+        }
+    }
+}
+
+void MNNExp(float* dst, const float* src, float* offset, size_t dataSize) {
+    int countC8        = static_cast<int32_t>(dataSize) / 8;
+    int remain = static_cast<int32_t>(dataSize) % 8;
+    static const float parameters[] = {
+        (float)logf(2.0f), 1.0f / (float)logf(2.0f), 0.25f, 1.0f, 0.5f, 1.0f / 6.0f, 1.0f / 24.0f, 1.0f / 120.0f};
+    if (countC8 > 0) {
+        // Align to eight so asm is easier to write
+        MNNExpC8(dst, src, offset, parameters, countC8);
+    }
+    if (remain > 0) {
+        auto param = parameters[0];
+        float xLimit = 87;
+        float summer = offset[3];
+        auto source = src + countC8 * 8;
+        auto dest = dst + countC8 * 8;
+        for (int i = 0; i < remain; ++i) {
+            auto x         = source[i] * offset[0] + offset[2];
+            x = ALIMAX(x, -xLimit);
+            x = ALIMIN(x, xLimit);
+            int div        = (x * parameters[1]);
+            int div2       = (div + 127) << 23;
+            auto xReamin   = x - div * param;
+            float expBasic = *(float*)(&div2);
+            auto t = xReamin * 0.25f;
+            auto expRemain =
+            ((((parameters[7] * t + parameters[6]) * t + parameters[5]) * t + parameters[4]) * t + 1.0f) * t +
+                1.0f;
+            expRemain = expRemain * expRemain;
+            expRemain = expRemain * expRemain;
+            dest[i] = expBasic * expRemain + offset[1];
+            summer+= dest[i];
+        }
+        offset[3] = summer;
+    }
+}
+void MNNTanh(float* dst, const float* src, size_t dataSize) {
+    /* Origin Code
+    for (int i = 0; i < dataSize; i++) {
+        // outputData[i] = 1 - 2 / (expf(2 * inputData[i]) + 1);
+        dst[i] = tanhf_poly(src[i]);
+    }
+     */
+    float offset[4] = {
+        -2.0f,
+        0.0f,
+        0.0f,
+        0.0f
+    };
+    MNNExp(dst, src, offset, dataSize);
+    for (int i = 0; i < dataSize; i++) {
+        // outputData[i] = 1 - 2 / (expf(2 * inputData[i]) + 1);
+        auto expX2 = dst[i];
+        dst[i] = (1.0f - expX2) / (1.0f + expX2);
+    }
+}
+
+void MNNReluWithSlope(float* dst, const float* src, size_t sizeQuad, float slope) {
+    float slopeValue[4];
+    for (int i=0; i<4; ++i) {
+        slopeValue[i] = slope;
+    }
+    MNNReluWithSlopeChannel(dst, src, slopeValue, sizeQuad, 1);
+}
+
+void MNNReluWithSlopeCommon(float* dst, const float* src, size_t size, float slope) {
+    int sizeQuad = static_cast<int32_t>(size) / 4;
+    int remain = static_cast<int32_t>(size) % 4;
+    if (sizeQuad > 0) {
+        MNNReluWithSlope(dst, src, sizeQuad, slope);
+    }
+    if (remain > 0) {
+        float intmp[4] = {0}, outmp[4] = {0};
+        ::memcpy(intmp, src + sizeQuad * 4, remain * sizeof(float));
+        MNNReluWithSlope(outmp, intmp, 1, slope);
+        ::memcpy(dst + sizeQuad * 4, outmp, remain * sizeof(float));
+    }
+}
+
+void MNNHardSwishCommon(float* dst, const float* src, size_t size) {
+    int sizeQuad = static_cast<int32_t>(size / 4);
+    int remain = static_cast<int32_t>(size) % 4;
+#undef MNN_USE_SSE
+#ifdef MNN_USE_SSE
+    if (sizeQuad > 0) {
+        MNNHardSwish(dst, src, sizeQuad);
+    }
+    if (remain > 0) {
+        float intmp[4] = {0}, outmp[4] = {0};
+        ::memcpy(intmp, src + sizeQuad * 4, remain * sizeof(float));
+        MNNHardSwish(outmp, intmp, 1);
+        ::memcpy(dst + sizeQuad * 4, outmp, remain * sizeof(float));
+    }
+#else
+#ifdef MNN_USE_NEON
+    float32x4_t zero = vdupq_n_f32(0.f);
+    float32x4_t three = vdupq_n_f32(3.f);
+    float32x4_t six = vdupq_n_f32(6.f);
+    float32x4_t divsix = vdupq_n_f32(1.0f/6.f);
+    for (int i = 0; i < sizeQuad; i++) {
+        auto x = vld1q_f32(src + 4 * i);
+        auto y = vmulq_f32(vmulq_f32(x, vminq_f32(vmaxq_f32(vaddq_f32(x, three), zero), six)), divsix);
+        vst1q_f32(dst + 4 * i, y);
+    }
+    if (remain > 0) {
+        float intmp[4] = {0}, outmp[4] = {0};
+        ::memcpy(intmp, src + sizeQuad * 4, remain * sizeof(float));
+        auto x = vld1q_f32(intmp);
+        auto y = vmulq_f32(vmulq_f32(x, vminq_f32(vmaxq_f32(vaddq_f32(x, three), zero), six)), divsix);
+        vst1q_f32(outmp, y);
+        ::memcpy(dst + sizeQuad * 4, outmp, remain * sizeof(float));
+    }
+#else
+    for (int j = 0; j < size; j++) {
+        if (src[j] <= -3) {
+            dst[j] = 0;
+        } else if (src[j] >= 3){
+            dst[j] = src[j];
+        } else {
+            dst[j] = src[j] * (src[j] + 3) / 6.f;
+        }
+    }
+#endif
+#endif
+}
+
+void MNNGeluStandardCommon(float* dst, const float* src, size_t size) {
+    for (int i = 0; i < size; i++) {
+        dst[i] = (erf(src[i] * 0.7071067932881648) + 1) * src[i] * 0.5;
+    }
+}
+
+void MNNGeluCommon(float* dst, const float* src, size_t size) {
+    int sizeQuad = static_cast<int32_t>(size / 8);
+    int remain = static_cast<int32_t>(size) % 8;
+#if defined(MNN_USE_SSE) || defined(MNN_USE_NEON)
+    float parameters[8] = {0.044715f, 0.79788458f, 378.f, 17325.f, 135135.f, 28.f, 3150.f, 62370.f};
+    if (sizeQuad > 0) {
+        MNNGelu(dst, src, sizeQuad, parameters);
+    }
+    if (remain > 0) {
+        float intmp[8] = {0};
+        float outmp[8] = {0};
+        ::memcpy(intmp, src + 8 * sizeQuad, remain * sizeof(float));
+        MNNGelu(outmp, intmp, 1, parameters);
+        ::memcpy(dst + 8 * sizeQuad, outmp, remain * sizeof(float));
+    }
+#else
+    auto tanhf_poly = [](float value) -> float {
+        if (value > 5.0f) {
+            return 1.0f;
+        } else if (value <= -5.0f) {
+            return -1.0f;
+        } else {
+            float x2 = value * value;
+            float a  = value * (135135.0f + x2 * (17325.0f + x2 * (378.0f + x2)));
+            float b  = 135135.0f + x2 * (62370.0f + x2 * (3150.0f + x2 * 28.0f));
+            return a / b;
+        }
+    };
+    for (int i = 0; i < size; i++) {
+        float temp = 0.044715f * src[i] * src[i] * src[i];
+        temp = 0.79788458f * (temp + src[i]);
+        dst[i] = (1.0f + tanhf_poly(temp)) * src[i] * 0.5f;
+    }
+#endif
+}
+
+void MNNScaleAndAddBiasScalar(float* dst, const float* src, float bias, float alpha, size_t number) {
+    int numberC4 = (int)number / 4;
+    int start = 0;
+    if (numberC4 > 0) {
+        float biasC4[4] = {
+            bias,
+            bias,
+            bias,
+            bias
+        };
+        float alphaC4[4] = {
+            alpha,
+            alpha,
+            alpha,
+            alpha
+        };
+        MNNScaleAndAddBias(dst, src, biasC4, alphaC4, numberC4, 1);
+        start = numberC4 * 4;
+    }
+    for (int i=start; i<number; ++i) {
+        dst[i] = src[i] * alpha + bias;
+    }
+}
+void MNNSin(float* dst, const float* src, size_t dataSize) {
+    for (int i = 0; i < dataSize; i++) {
+        dst[i] = sinf(src[i]);
+    }
+}
+void MNNSigmoid(float* dst, const float* src, size_t dataSize) {
+    float offset[4] = {
+       -1.0f,
+        0.0f,
+        0.0f,
+        0.0f
+    };
+    MNNExp(dst, src, offset, dataSize);
+    for (int i = 0; i < dataSize; ++i) {
+        dst[i] = 1.0f / (1.0f + dst[i]);
+    }
+}
+
+void MNNSiLu(float* dst, const float* src, size_t dataSize) {
+    float offset[4] = {
+       -1.0f,
+        0.0f,
+        0.0f,
+        0.0f
+    };
+    MNNExp(dst, src, offset, dataSize);
+    for (int i = 0; i < dataSize; ++i) {
+        dst[i] = src[i] / (1.0f + dst[i]);
+    }
+}
+
+/**
+ Modified from https://github.com/alibaba/MNN/pull/1359
+ Thanks for https://github.com/hroken
+ */
+void MNNSigmoidLowp(float* dst, const float* src, size_t dataSize) {
+    float offset[4] = {
+       -1.0f,
+        0.0f,
+        0.0f,
+        0.0f
+    };
+    MNNExp(dst, src, offset, dataSize);
+#ifdef MNN_USE_NEON
+    int dataC4 = static_cast<int32_t>(dataSize) / 4;
+    int remain = static_cast<int32_t>(dataSize) % 4;
+    float32x4_t value = vdupq_n_f32(1.0f);
+
+    if(dataC4 > 0) {
+        float32x4_t out = vld1q_f32(dst);
+        // neon optimization for sigmid cpu
+        for (int i = 1; i < dataC4; ++i) {
+            out = vrecpeq_f32(vaddq_f32(value,out));
+            vst1q_f32(dst ,out);
+            dst += 4;
+            out = vld1q_f32(dst);
+        }
+        out = vrecpeq_f32(vaddq_f32(value,out));
+        vst1q_f32(dst, out);
+        dst += 4;
+    }
+    if (remain > 0) {
+        float intmp[4] = {0};
+        ::memcpy(intmp, dst, remain * sizeof(float));
+        float32x4_t out = vld1q_f32(intmp);
+        out = vrecpeq_f32(vaddq_f32(value,out));
+        vst1q_f32(intmp, out);
+        ::memcpy(dst, intmp, remain * sizeof(float));
+    }
+#else
+    for (int i = 0; i < dataSize; ++i) {
+        dst[i] = 1.0f / (1.0f + dst[i]);
+    }
+#endif
+}
+
+void MNNSiLuLowp(float* dst, const float* src, size_t dataSize) {
+    float offset[4] = {
+       -1.0f,
+        0.0f,
+        0.0f,
+        0.0f
+    };
+    MNNExp(dst, src, offset, dataSize);
+#ifdef __aarch64__
+    int dataC4 = static_cast<int32_t>(dataSize) / 4;
+    int remain = static_cast<int32_t>(dataSize) % 4;
+    float32x4_t one = vdupq_n_f32(1.0f);
+
+    if(dataC4 > 0) {
+        float32x4_t out = vld1q_f32(dst);
+        float32x4_t in = vld1q_f32(src);
+        // neon optimization for sigmid cpu
+        for (int i = 1; i < dataC4; ++i) {
+            out = vdivq_f32(in, vaddq_f32(one,out));
+            vst1q_f32(dst ,out);
+            dst += 4;
+            src += 4;
+            out = vld1q_f32(dst);
+            in = vld1q_f32(src);
+        }
+        out = vdivq_f32(in, vaddq_f32(one,out));
+        vst1q_f32(dst, out);
+        dst += 4;
+        src += 4;
+    }
+    if (remain > 0) {
+        float intmp[4] = {0};
+        float atmp[4] = {0};
+        ::memcpy(intmp, dst, remain * sizeof(float));
+        ::memcpy(atmp, src, remain * sizeof(float));
+        float32x4_t out = vld1q_f32(intmp);
+        float32x4_t in = vld1q_f32(atmp);
+        out = vdivq_f32(in, vaddq_f32(one, out));
+        vst1q_f32(intmp, out);
+        ::memcpy(dst, intmp, remain * sizeof(float));
+    }
+#else
+    for (int i = 0; i < dataSize; ++i) {
+        dst[i] = src[i] / (1.0f + dst[i]);
+    }
+#endif
 }
 
 static XPUCoreFunctions* gCoreFunction = nullptr;

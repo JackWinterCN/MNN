@@ -60,7 +60,8 @@ XPUBackend::~XPUBackend() {
 Execution *XPUBackend::onCreate(const std::vector<Tensor *> &inputs,
                                 const std::vector<Tensor *> &outputs,
                                 const MNN::Op *op) {
-  MNN_PRINT("[XPU] XPUBackend::onCreate(), this: %p.\n", this);
+  MNN_PRINT("[XPU] XPUBackend::onCreate(), type %s, this: %p.\n",
+            MNN::EnumNameOpType(op->type()), this);
   auto iter = mOpCreatorsMap.find(op->type());
 
   if (iter == mOpCreatorsMap.end()) {
@@ -99,20 +100,13 @@ ErrorCode XPUBackend::onResizeEnd() {
 
 Backend::MemObj *XPUBackend::onAcquire(const Tensor *tensor,
                                        StorageType storageType) {
-  MNN_PRINT("[XPU] XPUBackend::onAcquire(), storageType: %d, this: %p.\n",
-            storageType, this);
-
   auto tensorShape = XPU::tensorShapeFormat(tensor);
   int N = tensorShape.at(0);
   int H = tensorShape.at(1);
   int W = tensorShape.at(2);
   int C = tensorShape.at(3);
 
-  MNN_PRINT("NHWC:[%d, %d, %d, %d]\n", N, H, W, C);
-
   size_t size;
-  float typeSize = getBytes(tensor);
-  MNN_PRINT("typeSize: %f\n", typeSize);
   if (MNN_DATA_FORMAT_NC4HW4 == TensorUtils::getDescribe(tensor)->dimensionFormat &&
       tensor->dimensions() >= 2) {
     auto alignC = ROUND_UP(C, 4);
@@ -126,7 +120,12 @@ Backend::MemObj *XPUBackend::onAcquire(const Tensor *tensor,
     size = ROUND_UP(size, 4);
   }
   size = ROUND_UP(size, 2);
-  MNN_PRINT("size: %ld\n", size);
+  float typeSize = getBytes(tensor);
+
+  MNN_PRINT("[XPU] XPUBackend::onAcquire() storageType:%d, NHWC:[%d, %d, %d, %d], "
+            "typeSize: %f, size: %ld, this: %p\n",
+            storageType, N, H, W, C, typeSize, size, this);
+
   if (storageType != STATIC && storageType != DYNAMIC) {
     MNN_ERROR("not support storageType %d\n", storageType);
     return nullptr;
@@ -159,7 +158,7 @@ void XPUBackend::copyFromDevice(const Tensor* srcTensor, const Tensor* dstTensor
     if (directCopy) {
       void *hostPtr = dstTensor->host<float>();
       memcpy(hostPtr, (void *)srcTensor->deviceId(), needSize);
-      MNN_PRINT("direct copy %d bytes, device addr: %p -> host addr: %p\n", needSize,
+      MNN_PRINT("[XPU] (device->host) size: %d bytes, %p ->%p\n", needSize,
                 (void *)srcTensor->deviceId(), hostPtr);
       return;
     } else {
@@ -187,8 +186,8 @@ void XPUBackend::copyToDevice(const Tensor* srcTensor, const Tensor* dstTensor) 
     }
     if(directCopy){
       memcpy((void *)dstTensor->deviceId(), hostPtr, needSize);
-      MNN_PRINT("direct copy %d bytes, host addr: %p -> device addr: %p\n",
-                needSize, hostPtr, (void *)dstTensor->deviceId());
+      MNN_PRINT("[XPU] (host->device) size: %d bytes, %p -> %p\n", needSize,
+                hostPtr, (void *)dstTensor->deviceId());
       return;
     } else {
       MNN_ERROR("copyToDevice can NOT direct copy, srcDimensionFormat:%d, "
@@ -261,17 +260,15 @@ void XPUBackend::copyToDevice(const Tensor* srcTensor, const Tensor* dstTensor) 
 void XPUBackend::onCopyBuffer(const Tensor *srcTensor,
                               const Tensor *dstTensor) const {
   MNN_PRINT("[XPU] XPUBackend::onCopyBuffer(), this: %p.\n", this);
-  if (srcTensor->host<float>() == nullptr) {
-    MNN_PRINT("srcTensor host: null\n");
-  }
-  if (dstTensor->host<void>() == nullptr) {
-    MNN_PRINT("dstTensor host: null\n");
-  }
+  // if (srcTensor->host<float>() == nullptr) {
+  //   MNN_PRINT("srcTensor host: null. ");
+  // }
+  // if (dstTensor->host<void>() == nullptr) {
+  //   MNN_PRINT("dstTensor host: null. \n");
+  // }
   if (srcTensor->host<float>() != nullptr) {
-    MNN_PRINT("copyToDevice\n");
     copyToDevice(srcTensor, dstTensor);
   } else if (dstTensor->host<void>() != nullptr) {
-    MNN_PRINT("copyFromDevice\n");
     copyFromDevice(srcTensor, dstTensor);
   } else {
     MNN_PRINT("copyBetweenDevice[Not supported]\n");
@@ -305,4 +302,4 @@ float XPUBackend::getBytes(const Tensor* tensor) {
     return bytes;
 }
 
-}
+}

@@ -16,7 +16,7 @@
 
 #include <MNN/Rect.h>
 #include "core/Macro.h"
-#include "backend/cpu/compute/Int8FunctionsOpt.h"
+#include "backend/xpu/execution/compute/XPUInt8FunctionsOpt.hpp"
 
 namespace MNN {
 namespace XPU {
@@ -76,9 +76,9 @@ void MNNPackC4(float* dst, const float* src, size_t area, size_t depth, int* are
 
 // void MNNUnpackC4Uint8(uint8_t* dst, const uint8_t* src, size_t area,size_t depth, int* areaOffset);
 
-// void MNNScaleAndAddBias(float* dst, const float* src, const float* bias, const float* alpha, size_t planeNumber,
-//                         size_t biasNumber);
-// void MNNScaleAndAddBiasScalar(float* dst, const float* src, float bias, float alpha, size_t number);
+void MNNScaleAndAddBias(float* dst, const float* src, const float* bias, const float* alpha, size_t planeNumber,
+                        size_t biasNumber);
+void MNNScaleAndAddBiasScalar(float* dst, const float* src, float bias, float alpha, size_t number);
 
 // // TODO: Swap the name for MNNUnpackTranspose and MNNPackTranspose
 // void MNNUnpackTranspose(float* dst, const float* src, size_t area, size_t depth, int* areaOffset);
@@ -102,18 +102,18 @@ void MNNPackC4(float* dst, const float* src, size_t area, size_t depth, int* are
 
 // void MNNExpC8(float* dest, const float* source, float* offset, const float* parameters, size_t countC8);
 
-// // Offset: o0, o1, o2, o3: dst = exp(src*o0+o2)+o1, o3 = o3+sum(dst)
-// void MNNExp(float* dst, const float* src, float* offset, size_t dataSize);
-// void MNNSin(float* dst, const float* src, size_t dataSize);
-// void MNNTanh(float* dst, const float* src, size_t dataSize);
-// void MNNSigmoid(float* dst, const float* src, size_t dataSize);
-// void MNNSigmoidLowp(float* dst, const float* src, size_t dataSize);
-// void MNNSiLu(float* dst, const float* src, size_t dataSize);
-// void MNNSiLuLowp(float* dst, const float* src, size_t dataSize);
-// void MNNReluWithSlopeCommon(float* dst, const float* src, size_t size, float slope);
-// void MNNHardSwishCommon(float* dst, const float* src, size_t size);
-// void MNNGeluCommon(float* dst, const float* src, size_t size);
-// void MNNGeluStandardCommon(float* dst, const float* src, size_t size);
+// Offset: o0, o1, o2, o3: dst = exp(src*o0+o2)+o1, o3 = o3+sum(dst)
+void MNNExp(float* dst, const float* src, float* offset, size_t dataSize);
+void MNNSin(float* dst, const float* src, size_t dataSize);
+void MNNTanh(float* dst, const float* src, size_t dataSize);
+void MNNSigmoid(float* dst, const float* src, size_t dataSize);
+void MNNSigmoidLowp(float* dst, const float* src, size_t dataSize);
+void MNNSiLu(float* dst, const float* src, size_t dataSize);
+void MNNSiLuLowp(float* dst, const float* src, size_t dataSize);
+void MNNReluWithSlopeCommon(float* dst, const float* src, size_t size, float slope);
+void MNNHardSwishCommon(float* dst, const float* src, size_t size);
+void MNNGeluCommon(float* dst, const float* src, size_t size);
+void MNNGeluStandardCommon(float* dst, const float* src, size_t size);
 // void MNNSoftmax(float* dest, const float* source, size_t size);
 // void MNNNorm(float* dest, const float* source, const float *gamma, const float *beta, float epsilon, size_t size, bool RMSNorm = false);
 

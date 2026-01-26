@@ -64,6 +64,9 @@ public:
   inline int threadNumber() const {
     return mThreadNumber;
   }
+  BackendConfig::PrecisionMode precisionMode() const {
+    return mPrecision;
+  }
   void computeDivideSizes(int size, int *dst, float avgDiv = 0) const {
     // if (mGroupWithComputeRate.size() <= 1 ||
     //     (avgDiv > 0 && avgDiv < mComputeI)) {
@@ -148,4 +151,4 @@ public:
   }
 
 } // namespace MNN
-#endif // MNN_XPU_BACKEND_HPP
+#endif // MNN_XPU_BACKEND_HPP

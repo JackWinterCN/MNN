@@ -13,6 +13,7 @@
 #include "backend/xpu/execution/compute/XPUConvolutionFloatFactory.hpp"
 #include "core/Macro.h"
 #include "core/TensorUtils.hpp"
+#include "core/ConvolutionCommon.hpp"
 
 namespace MNN {
 using namespace XPU;

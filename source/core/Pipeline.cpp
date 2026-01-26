@@ -15,6 +15,7 @@
 #include "geometry/GeometryComputerUtils.hpp"
 #include "shape/SizeComputer.hpp"
 #include "core/OpCommonUtils.hpp"
+#include <MNN/MNNDefine.h>
 
 // TODO: Find better way for debug
 //#define MNN_OP_SEPERATE
@@ -692,10 +693,14 @@ static void _SetTensorBackend(Schedule::PipelineInfo& mInfo, bool ownInputs) {
                     }
                 }
             }
+            MNN_PRINT("set tensor backend for: %s, outputs num: %ld\n",
+                      EnumNameOpType(iter.op->type()), iter.outputs.size());
             for (auto t : iter.outputs) {
                 auto des = TensorUtils::getDescribeOrigin(t);
                 if (nullptr == des->mem.get() && nullptr == des->getBackend()) {
                     des->setBackend(curBackend);
+                    MNN_PRINT("tensor: %p, backend: %d\n", t,
+                              curBackend->type());
                 }
             }
         }
@@ -754,9 +759,16 @@ static ErrorCode _InsertCopy(Schedule::PipelineInfo& mInfo, std::map<Tensor*, st
             }
 #endif
             iter.workInputs = iter.inputs;
+            MNN_PRINT("insert copy for: %s, inputs num: %ld, op backend: %d\n",
+                      EnumNameOpType(iter.op->type()), iter.workInputs.size(),
+                      curBackend->type());
             for (int v=0; v<iter.inputs.size(); ++v) {
                 auto t = iter.inputs[v];
                 auto des = TensorUtils::getDescribe(t);
+                MNN_PRINT("input tensor: %p, backend: %d\n", t,
+                          TensorUtils::getDescribeOrigin(t)->getBackend()
+                              ? TensorUtils::getDescribeOrigin(t)->getBackend()->type()
+                              : MNN_FORWARD_CPU);
                 if (WrapExecution::needWrap(t, curBackend)) {
                     do {
                         Tensor* newTensor = nullptr;
@@ -964,7 +976,7 @@ ErrorCode Pipeline::fixResizeCache() {
 
     mInfo.first.cache.first->onSelectDynamicAllocator(0, 2);
     res && mInfo.first.cache.second->onSelectDynamicAllocator(0, 2);
-    MNN_PRINT("Fix: %d - Total: %d, rate = %f\n", fixNumber, totalNumber, (float)fixNumber / (float)totalNumber);
+    MNN_PRINT("Fix: %ld - Total: %ld, rate = %f\n", fixNumber, totalNumber, (float)fixNumber / (float)totalNumber);
 #endif
     return NO_ERROR;
 }
@@ -1023,6 +1035,9 @@ ErrorCode Pipeline::_allocForTensor(int index, bool allocInput) {
                 MNN_PRINT("%f, before Resize: %s - %d\n", memory, info.op->name()->c_str(), cmdIndex);
             }
 #endif
+            MNN_PRINT("[XPU] Alloc Tensors for: %s, inputs num: %ld, op backend: %d\n",
+                      EnumNameOpType(iter.op->type()), iter.workInputs.size(),
+                      iter.execution->backend()->type());
             // Alloc for Tensors
             auto curBackend = iter.execution->backend();
             if (allocInput) {
@@ -1216,14 +1231,20 @@ ErrorCode Pipeline::execute() {
             }
 #endif
 #ifdef MNN_OP_TIME_DEBUG
+            MNN_PRINT("%s(%s) --> start\n", EnumNameOpType(cmd.op->type()),
+                      EnumNameOpType(cmd.op->type()));
             _t.reset();
 #endif
             auto code = cmd.execution->onExecute(cmd.workInputs, cmd.workOutputs);
 
 #ifdef MNN_OP_TIME_DEBUG
-            time_cost.push_back({std::string(EnumNameOpType(cmd.op->type())) +
-                                     "(" + EnumNameOpType(cmd.op->type()) + ")",
-                                 (float)_t.durationInUs() / 1000.0f});
+            MNN_PRINT("%s(%s) <-- cost: %f ms\n",
+                      EnumNameOpType(cmd.op->type()),
+                      EnumNameOpType(cmd.op->type()),
+                      (float)_t.durationInUs() / 1000.0f);
+            // time_cost.push_back({std::string(EnumNameOpType(cmd.op->type())) +
+            //                          "(" + EnumNameOpType(cmd.op->type()) + ")",
+            //                      (float)_t.durationInUs() / 1000.0f});
 #endif
             if (NO_ERROR != code) {
                 _exitExecute();

@@ -4,6 +4,7 @@
 #include <MNN/expr/ExprCreator.hpp>
 #include <MNN/expr/Module.hpp>
 #include <MNN/AutoTime.hpp>
+#include <MNN/MNNDefine.h>
 
 #include <cv/cv.hpp>
 
@@ -21,7 +22,7 @@ int main(int argc, const char *argv[]) {
   int thread = 4;
   int precision = BackendConfig::Precision_High;
   int forwardType = MNN_FORWARD_CPU;
-  int warmup = 2;
+  int warmup = 0;
   const auto model_file = argv[1];
   const auto input_file = argv[2];
   if (argc >= 4) {
@@ -66,36 +67,36 @@ int main(int argc, const char *argv[]) {
   auto input = _Unsqueeze(image, {0});
   input = _Convert(input, NC4HW4);
   for (int i = 0; i < warmup; i++) {
-    printf("======> net forward warmup start\n");
+    MNN_PRINT("======> net forward warmup start\n");
     MNN::Timer _t;
     auto outputs = net->onForward({input});
     auto time = (float)_t.durationInUs() / 1000.0f;
-    printf("======> net forward time = %f ms\n", time);
+    MNN_PRINT("======> net forward time = %f ms\n", time);
   }
-  printf("======> net forward start\n");
+  MNN_PRINT("======> net forward start\n");
   MNN::Timer _t;
   auto outputs = net->onForward({input});
   auto time = (float)_t.durationInUs() / 1000.0f;
-  printf("======> net forward time = %f ms\n", time);
+  MNN_PRINT("======> net forward time = %f ms\n", time);
 
   auto output = _Convert(outputs[0], NCHW);
   output = _Squeeze(output);
   // output shape: [25200, 85]; 85 means: [cx, cy, w, h, box_conf, prob * 80]
   // get box_conf > 0.3 output
-  printf("dims = ");
-  for (auto d : output->getInfo()->dim)
-    printf("%d, ", d);
-  printf("\n");
+  MNN_PRINT("dims: \n");
+  for (auto d : output->getInfo()->dim) {
+    MNN_PRINT("%d\n", d);
+  }
   auto box_conf = _GatherV2(output, _Scalar<int>(4), _Scalar<int>(1));
   auto has_object = _Greater(box_conf, _Scalar<float>(0.1));
   auto idx = Express::_Where(has_object);
   // idx->getTensor()->print();
   output = Express::_GatherND(output, idx);
   // idx->getTensor()->print();
-  printf("dims = ");
-  for (auto d : output->getInfo()->dim)
-    printf("%d, ", d);
-  printf("\n");
+  MNN_PRINT("dims: \n");
+  for (auto d : output->getInfo()->dim) {
+    MNN_PRINT("%d\n", d);
+  }
   output = _Transpose(output, {1, 0}); // to [85, 25200]
   auto cx = _Gather(output, _Scalar<int>(0));
   auto cy = _Gather(output, _Scalar<int>(1));
@@ -133,7 +134,7 @@ int main(int argc, const char *argv[]) {
     auto y1 = box_ptr[idx * 4 + 3] * scale;
     auto class_idx = ids_ptr[idx];
     auto score = score_ptr[idx];
-    printf("### box: {%f, %f, %f, %f}, class_idx: %d, score: %f\n", x0, y0, x1,
+    MNN_PRINT("### box: {%f, %f, %f, %f}, class_idx: %d, score: %f\n", x0, y0, x1,
            y1, class_idx, score);
     rectangle(original_image, {x0, y0}, {x1, y1}, {0, 0, 255}, 2);
   }

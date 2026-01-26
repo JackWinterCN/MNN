@@ -11,6 +11,7 @@
 
 #include <assert.h>
 #include <stdio.h>
+#include <cstring>
 
 #if defined(__APPLE__)
 #include <TargetConditionals.h>
@@ -35,8 +36,17 @@
 #define MNN_PRINT(format, ...) syslog(LOG_WARNING, format, ##__VA_ARGS__); fprintf(stderr, format, ##__VA_ARGS__)
 #define MNN_ERROR(format, ...) syslog(LOG_WARNING, format, ##__VA_ARGS__); fprintf(stderr, format, ##__VA_ARGS__)
 #else
-#define MNN_PRINT(format, ...) {printf("[%s:%d] ", __FILE__, __LINE__); printf(format, ##__VA_ARGS__);}
-#define MNN_ERROR(format, ...) {printf("[%s:%d] ", __FILE__, __LINE__); printf(format, ##__VA_ARGS__);}
+// #define MNN_PRINT(format, ...) {printf("[%s:%d] ", __FILE__, __LINE__); printf(format, ##__VA_ARGS__);}
+// #define MNN_ERROR(format, ...) {printf("[%s:%d] ", __FILE__, __LINE__); printf(format, ##__VA_ARGS__);}
+
+static const char* const_basename(const char* filepath) {
+  const char* base = strrchr(filepath, '/');
+  return base ? (base + 1) : filepath;
+}
+
+#define MNN_PRINT(format, ...) {printf("[%s:%d] ", const_basename(__FILE__), __LINE__); printf(format, ##__VA_ARGS__);}
+#define MNN_ERROR(format, ...) {printf("[%s:%d] ", const_basename(__FILE__), __LINE__); printf(format, ##__VA_ARGS__);}
+
 #endif
 
 #ifdef DEBUG
