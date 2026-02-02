@@ -693,14 +693,17 @@ static void _SetTensorBackend(Schedule::PipelineInfo& mInfo, bool ownInputs) {
                     }
                 }
             }
+#ifdef XPU_DEBUG
             MNN_PRINT("set tensor backend for: %s, outputs num: %ld\n",
                       EnumNameOpType(iter.op->type()), iter.outputs.size());
+#endif
             for (auto t : iter.outputs) {
                 auto des = TensorUtils::getDescribeOrigin(t);
                 if (nullptr == des->mem.get() && nullptr == des->getBackend()) {
                     des->setBackend(curBackend);
-                    MNN_PRINT("tensor: %p, backend: %d\n", t,
-                              curBackend->type());
+#ifdef XPU_DEBUG
+                    MNN_PRINT("tensor: %p, backend: %d\n", t, curBackend->type());
+#endif
                 }
             }
         }
@@ -759,16 +762,20 @@ static ErrorCode _InsertCopy(Schedule::PipelineInfo& mInfo, std::map<Tensor*, st
             }
 #endif
             iter.workInputs = iter.inputs;
+#ifdef XPU_DEBUG
             MNN_PRINT("insert copy for: %s, inputs num: %ld, op backend: %d\n",
                       EnumNameOpType(iter.op->type()), iter.workInputs.size(),
                       curBackend->type());
+#endif
             for (int v=0; v<iter.inputs.size(); ++v) {
                 auto t = iter.inputs[v];
                 auto des = TensorUtils::getDescribe(t);
+#ifdef XPU_DEBUG
                 MNN_PRINT("input tensor: %p, backend: %d\n", t,
                           TensorUtils::getDescribeOrigin(t)->getBackend()
                               ? TensorUtils::getDescribeOrigin(t)->getBackend()->type()
                               : MNN_FORWARD_CPU);
+#endif
                 if (WrapExecution::needWrap(t, curBackend)) {
                     do {
                         Tensor* newTensor = nullptr;
@@ -1035,9 +1042,11 @@ ErrorCode Pipeline::_allocForTensor(int index, bool allocInput) {
                 MNN_PRINT("%f, before Resize: %s - %d\n", memory, info.op->name()->c_str(), cmdIndex);
             }
 #endif
-            MNN_PRINT("[XPU] Alloc Tensors for: %s, inputs num: %ld, op backend: %d\n",
+#ifdef XPU_DEBUG
+            MNN_PRINT("[MNN] Alloc Tensors for: %s, inputs num: %ld, op backend: %d\n",
                       EnumNameOpType(iter.op->type()), iter.workInputs.size(),
                       iter.execution->backend()->type());
+#endif
             // Alloc for Tensors
             auto curBackend = iter.execution->backend();
             if (allocInput) {

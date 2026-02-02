@@ -49,6 +49,7 @@ int main(int argc, const char* argv[]) {
 
     std::shared_ptr<Module> net(Module::load(std::vector<std::string>{}, std::vector<std::string>{}, argv[1], rtmgr));
     auto original_image = imread(argv[2]);
+    auto original_image_ptr = original_image->readMap<uint8_t>();
     auto dims = original_image->getInfo()->dim;
     int ih = dims[0];
     int iw = dims[1];
@@ -57,9 +58,12 @@ int main(int argc, const char* argv[]) {
     std::vector<int> padvals { 0, len - ih, 0, len - iw, 0, 0 };
     auto pads = _Const(static_cast<void*>(padvals.data()), {3, 2}, NCHW, halide_type_of<int>());
     auto image = _Pad(original_image, pads, CONSTANT);
+    auto pads_ptr = pads->readMap<int>();
     image = resize(image, Size(640, 640), 0, 0, INTER_LINEAR, -1, {0., 0., 0.}, {1./255., 1./255., 1./255.});
+    auto image_ptr = image->readMap<float>();
     auto input = _Unsqueeze(image, {0});
-    input = _Convert(input, NC4HW4);
+    // input = _Convert(input, NC4HW4);
+    auto input_ptr = input->readMap<float>();
     auto outputs = net->onForward({input});
     auto output = _Convert(outputs[0], NCHW);
     output = _Squeeze(output);

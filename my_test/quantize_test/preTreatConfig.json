@@ -1,0 +1,47 @@
+{
+    "format":"BGR",
+    "mean":[
+        0,
+        0,
+        0
+    ],
+    "normal":[
+        0.00392156,
+        0.00392156,
+        0.00392156
+    ],
+    "width":640,
+    "height":640,
+    "path":"./images/",
+    "used_image_num":300,
+    "quant_bits":8,
+    "feature_clamp_value":127,
+    "weight_clamp_value":127,
+    "feature_quantize_method":"KL",
+    "weight_quantize_method":"MAX_ABS",
+    "skip_quant_op_names":[
+        "/model.20/cv3/act/Mul_output_0",
+        "/model.20/cv3/conv/Conv_output_0",
+        "/model.21/act/Mul_output_0",
+        "/model.21/conv/Conv_output_0",
+        "/model.23/m/m.0/cv1/act/Mul_output_0",
+        "/model.23/m/m.0/cv2/act/Mul_output_0",
+        "/model.23/m/m.0/cv2/conv/Conv_output_0",
+        "/model.23/cv3/act/Mul_output_0",
+        "/model.23/cv3/conv/Conv_output_0",
+        "/model.24/Mul_3_output_0",
+        "/model.24/Mul_7_output_0",
+        "/model.24/Mul_11_output_0",
+        "/model.24/m.2/Conv_output_0",
+        "/model.24/m.1/Conv_output_0",
+        "/model.23/cv2/conv/Conv_output_0",
+        "/model.23/cv1/act/Mul_output_0",
+        "/model.20/cv2/conv/Conv_output_0",
+        "/model.23/cv2/act/Mul_output_0",
+        "/model.20/cv1/act/Mul_output_0",
+        "/model.18/act/Mul_output_0",
+        "/model.23/m/m.0/cv1/conv/Conv_output_0",
+        "/model.20/cv2/act/Mul_output_0"
+    ],
+    "debug": true
+}

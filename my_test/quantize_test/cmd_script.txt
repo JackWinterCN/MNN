@@ -1,0 +1,6 @@
+wget -c http://images.cocodataset.org/zips/val2017.zip
+wget -c http://images.cocodataset.org/annotations/annotations_trainval2017.zip
+
+../../build/quantized.out yolov5s_v7.mnn yolov5s_v7_offline_quant.mnn preTreatConfig.json
+
+../../build/yolov5s.out yolov5s_v7.mnn ./bear_21.jpg

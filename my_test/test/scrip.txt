@@ -1,0 +1,3 @@
+disable multithread for xpu and delete code of multithread in xpu
+xpu suport int8: determine the necessary/used op(including determine the specific used function) while running yolov5 on xpu. For the used op and funtions, consider to implement the int8 version
+

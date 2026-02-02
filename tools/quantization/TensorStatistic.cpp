@@ -111,6 +111,7 @@ void TensorStatistic::updateDistribution() {
         index = std::min(index, mBinNumber - 1);
         mDistribution[index] += 1.0f;
     }
+    mVisited = true;
 }
 
 void TensorStatistic::setThresholdMethod(GET_THRESHOLD_METHOD thresholdMethod) {

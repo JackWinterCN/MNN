@@ -1,0 +1,21 @@
+[calibration.cpp:1092] Top 20 error tensors:
+[calibration.cpp:1097] /model.21/act/Mul_output_0/output_tensor_0:  cos distance: 0.950635, overflow ratio: 0.001104
+[calibration.cpp:1097] /model.23/m/m.0/cv2/act/Mul_output_0/output_tensor_0:  cos distance: 0.953740, overflow ratio: 0.001622
+[calibration.cpp:1097] /model.23/m/m.0/cv1/act/Mul_output_0/output_tensor_0:  cos distance: 0.960531, overflow ratio: 0.001301
+[calibration.cpp:1097] /model.23/cv3/act/Mul_output_0/output_tensor_0:  cos distance: 0.960793, overflow ratio: 0.002384
+[calibration.cpp:1097] /model.23/cv3/conv/Conv_output_0/output_tensor_0:  cos distance: 0.962427, overflow ratio: 0.000004
+[calibration.cpp:1097] /model.20/cv3/act/Mul_output_0/output_tensor_0:  cos distance: 0.962468, overflow ratio: 0.002150
+[calibration.cpp:1097] /model.21/conv/Conv_output_0/output_tensor_0:  cos distance: 0.963031, overflow ratio: 0.000003
+[calibration.cpp:1097] /model.20/cv3/conv/Conv_output_0/output_tensor_0:  cos distance: 0.963713, overflow ratio: 0.000002
+[calibration.cpp:1097] /model.23/cv1/act/Mul_output_0/output_tensor_0:  cos distance: 0.967179, overflow ratio: 0.000778
+[calibration.cpp:1097] /model.23/cv2/conv/Conv_output_0/output_tensor_0:  cos distance: 0.967431, overflow ratio: 0.000000
+[calibration.cpp:1097] /model.23/cv2/act/Mul_output_0/output_tensor_0:  cos distance: 0.968028, overflow ratio: 0.000321
+[calibration.cpp:1097] /model.23/m/m.0/cv2/conv/Conv_output_0/output_tensor_0:  cos distance: 0.968245, overflow ratio: 0.000000
+[calibration.cpp:1097] /model.20/cv2/conv/Conv_output_0/output_tensor_0:  cos distance: 0.968649, overflow ratio: 0.000002
+[calibration.cpp:1097] /model.20/cv1/act/Mul_output_0/output_tensor_0:  cos distance: 0.969066, overflow ratio: 0.000035
+[calibration.cpp:1097] /model.18/act/Mul_output_0/output_tensor_0:  cos distance: 0.969412, overflow ratio: 0.001001
+[calibration.cpp:1097] /model.23/m/m.0/cv1/conv/Conv_output_0/output_tensor_0:  cos distance: 0.970055, overflow ratio: 0.000000
+[calibration.cpp:1097] /model.20/cv2/act/Mul_output_0/output_tensor_0:  cos distance: 0.970441, overflow ratio: 0.000091
+[calibration.cpp:1097] /model.24/Pow_2_output_0/output_tensor_0:  cos distance: 0.970566, overflow ratio: 0.000208
+[calibration.cpp:1097] /model.13/cv3/act/Mul_output_0/output_tensor_0:  cos distance: 0.971042, overflow ratio: 0.000895
+[calibration.cpp:1097] /model.20/m/m.0/cv2/act/Mul_output_0/output_tensor_0:  cos distance: 0.972630, overflow ratio: 0.000279

@@ -19,6 +19,8 @@
 #endif
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -46,7 +48,7 @@ void Helper::readClibrationFiles(std::vector<std::string>& images, const std::st
         std::cout << "open " << filePath << " failed: " << strerror(errno) << std::endl;
         return;
     }
-    
+
     while (FindNextFile(hFind, &ffd))
     {
         if (ffd.cFileName[0] == '.') {
@@ -140,8 +142,7 @@ void Helper::readClibrationFiles(std::vector<std::string>& images, const std::st
 void Helper::preprocessInput(MNN::CV::ImageProcess* pretreat, PreprocessConfig preprocessConfig, const std::string& filename, MNN::Tensor* input, InputType inputType, MNN::Express::VARP var) {
     if (inputType == InputType::IMAGE) {
         int originalWidth, originalHeight, comp;
-        auto bitmap32bits = stbi_load(filename.c_str(), &originalWidth, &originalHeight, &comp, 4);
-
+        auto bitmap32bits = stbi_load(filename.c_str(), &originalWidth, &originalHeight, &comp, 3);
         DCHECK(bitmap32bits != nullptr) << "input image error!";
 
         const int hCropSize = int(originalHeight * preprocessConfig.centerCropHeight);
@@ -171,10 +172,36 @@ void Helper::preprocessInput(MNN::CV::ImageProcess* pretreat, PreprocessConfig p
         };
         MNN::CV::Matrix trans;
         trans.setPolyToPoly((MNN::CV::Point*)dstPoints, (MNN::CV::Point*)srcPoints, 4);
-        
+
         pretreat->setMatrix(trans);
         pretreat->convert(bitmap32bits, originalWidth, originalHeight, 0, input);
-
+        float w_scale = float(originalWidth) / float(ow);
+        float h_scale = float(originalHeight) / float(oh);
+        float *input_ptr = input->host<float>();
+        for(int i = 0; i < oh; i++) {
+            for (int j = 0; j < ow; j++) {
+                int input_offset = i * ow * 3 + j * 3;
+                int src_h = static_cast<int>(i * h_scale);
+                int src_w = static_cast<int>(j * w_scale);
+                int src_offset = src_h * originalWidth * 3 + src_w * 3;
+                (input_ptr + input_offset)[0] = (bitmap32bits+src_offset)[2] / 255.0f;
+                (input_ptr + input_offset)[1] = (bitmap32bits+src_offset)[1] / 255.0f;
+                (input_ptr + input_offset)[2] = (bitmap32bits+src_offset)[0] / 255.0f;
+            }
+        }
+        // stbi_write_jpg("test_1.jpg", originalWidth, originalHeight, 3, bitmap32bits, 100);
+        // {
+        //   uint8_t *temp_ptr = new uint8_t[oh * ow * 3];
+        //   for (int i = 0; i < oh; i++) {
+        //     for (int j = 0; j < ow; j++) {
+        //       temp_ptr[i * ow * 3 + j * 3 + 0] = (uint8_t)(input_ptr[i * ow * 3 + j * 3 + 2] * 255.0f);
+        //       temp_ptr[i * ow * 3 + j * 3 + 1] = (uint8_t)(input_ptr[i * ow * 3 + j * 3 + 1] * 255.0f);
+        //       temp_ptr[i * ow * 3 + j * 3 + 2] = (uint8_t)(input_ptr[i * ow * 3 + j * 3 + 0] * 255.0f);
+        //     }
+        //   }
+        //   stbi_write_jpg("test_2.jpg", ow, oh, 3, temp_ptr, 100);
+        //   delete[] temp_ptr;
+        // }
         stbi_image_free(bitmap32bits);
     }
     if (inputType == InputType::SEQUENCE) {
