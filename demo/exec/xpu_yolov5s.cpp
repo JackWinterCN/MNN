@@ -16,11 +16,12 @@ int main(int argc, const char *argv[]) {
   MNN_PRINT("run xpu_yolov5s.out\n");
   if (argc < 3) {
     MNN_PRINT("Usage: ./xpu_yolov5s.out model.mnn input.jpg [forwardType] "
-              "[precision] [thread]\n");
+              "[precision] [memory_mode] [thread]\n");
     return 0;
   }
   int thread = 4;
   int precision = BackendConfig::Precision_High;
+  int memory_mode = BackendConfig::Memory_Normal;
   int forwardType = MNN_FORWARD_CPU;
   int warmup = 0;
   const auto model_file = argv[1];
@@ -32,13 +33,17 @@ int main(int argc, const char *argv[]) {
     precision = atoi(argv[4]);
   }
   if (argc >= 6) {
-    thread = atoi(argv[5]);
+    memory_mode = atoi(argv[5]);
+  }
+  if (argc >= 7) {
+    thread = atoi(argv[6]);
   }
   MNN::ScheduleConfig sConfig;
   sConfig.type = static_cast<MNNForwardType>(forwardType);
   sConfig.numThread = thread;
   BackendConfig bConfig;
   bConfig.precision = static_cast<BackendConfig::PrecisionMode>(precision);
+  bConfig.memory = static_cast<BackendConfig::MemoryMode>(memory_mode);
   sConfig.backendConfig = &bConfig;
   std::shared_ptr<Executor::RuntimeManager> rtmgr =
       std::shared_ptr<Executor::RuntimeManager>(

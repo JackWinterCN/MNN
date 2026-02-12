@@ -17,6 +17,7 @@
 #include "core/MemoryFormater.h"
 #include "core/TensorUtils.hpp"
 #include "math/Vec.hpp"
+#include "backend/xpu/execution/XPUTensorConvert.hpp"
 
 #define PARAMETERSIZE 7
 
@@ -240,6 +241,468 @@ ErrorCode XPUDenseConvolutionTiledExecutor::onResize(const std::vector<Tensor *>
         return code;
     }
     return NO_ERROR;
+}
+
+XPUDenseConvolutionGeneralExecutor::XPUDenseConvolutionGeneralExecutor(const Convolution2DCommon* common, Backend* b,
+                                                   const float* originWeight, size_t originWeightSize,
+                                                   const float* bias, size_t biasSize, std::shared_ptr<ConvolutionCommon::Int8Common> int8Info)
+    : XPUConvolutionTiledExecutor(b, bias, biasSize) {
+
+    conv_common_param_.padX        = common->padX();
+    conv_common_param_.padY        = common->padY();
+    conv_common_param_.padMode     = common->padMode();
+    conv_common_param_.kernelX     = common->kernelX();
+    conv_common_param_.kernelY     = common->kernelY();
+    conv_common_param_.strideX     = common->strideX();
+    conv_common_param_.strideY     = common->strideY();
+    conv_common_param_.dilateX     = common->dilateX();
+    conv_common_param_.dilateY     = common->dilateY();
+    conv_common_param_.group       = common->group();
+    conv_common_param_.outputCount = common->outputCount();
+    conv_common_param_.inputCount  = common->inputCount();
+    conv_common_param_.relu       = common->relu();
+    conv_common_param_.relu6      = common->relu6();
+    if (common->pads()) {
+        conv_common_param_.pads.assign(common->pads()->begin(), common->pads()->end());
+    }
+    if (common->outPads()) {
+        conv_common_param_.outPads.assign(common->outPads()->begin(), common->outPads()->end());
+    }
+    conv_common_param_.hasOutputShape = common->hasOutputShape();
+   
+
+    conv_bias_.assign(bias, bias + biasSize);
+    conv_weight_.assign(originWeight, originWeight + originWeightSize);
+
+    auto outputCount = (int)biasSize;
+    int eP, lP, hP;
+    auto core = static_cast<XPUBackend*>(b)->functions();
+    int bytes = core->bytes;
+    core->MNNGetMatMulPackMode(&eP, &lP, &hP);
+    bool useInt8Weight = 0 == originWeightSize;
+    if (useInt8Weight) {
+        MNN_ASSERT(nullptr != int8Info.get());
+        originWeightSize = int8Info->weight.size();
+    }
+    if (int8Info && int8Info->canUseInt4) {
+        originWeightSize *= 2;
+    }
+    // Don't use common->inputCount for old model common->inputCount is zero
+    auto srcCount    = (int)originWeightSize / outputCount / common->kernelX() / common->kernelY();
+    auto lSize = srcCount * common->kernelX() * common->kernelY();
+    auto hU = UP_DIV(outputCount, hP);
+    auto lU = UP_DIV(lSize, lP);
+    if (useInt8Weight) {
+        // Quantize weight to int8
+        auto allocSuccess = XPUDenseConvolutionGeneralExecutor::initQuantizeResource(int8Info, mResource, hU, hP, lU, lP, outputCount, srcCount, common->kernelX() * common->kernelY(), bytes);
+        if (!allocSuccess) {
+            mValid = false;
+            return;
+        }
+    } else {
+        if (core->matmulBytes != 0) {
+            bytes = core->matmulBytes;
+        }
+        mResource->mWeight.reset(Tensor::createDevice<uint8_t>(
+            {hU * hP, lU * lP, bytes}));
+        mValid = mValid && backend()->onAcquireBuffer(mResource->mWeight.get(), Backend::STATIC);
+        if (!mValid) {
+            return;
+        }
+        std::shared_ptr<Tensor> cache(Tensor::createDevice<uint8_t>({outputCount, srcCount * common->kernelX() * common->kernelY(), (int)sizeof(float)})); // cache must be float
+        mValid = mValid && backend()->onAcquireBuffer(cache.get(), Backend::STATIC);
+        if (!mValid) {
+            return;
+        }
+        initWeight((float*)mResource->mWeight->deviceId(), originWeight, (float*)cache->deviceId(), srcCount, outputCount, common->kernelX() * common->kernelY(), core);
+        // MNN_PRINT("srcCount:%d, outputCount:%d, dense weight matrix tile:", srcCount, outputCount);
+        // formatMatrix(mResource->mWeight->host<float>(), {UP_DIV(outputCount, hP), lSize, hP});
+        backend()->onReleaseBuffer(cache.get(), Backend::STATIC);
+    }
+    mProxy.reset(new DenseConvolutionTiledImpl(common, b, mResource.get()));
+}
+
+XPUDenseConvolutionGeneralExecutor::XPUDenseConvolutionGeneralExecutor(std::shared_ptr<XPUConvolution::Resource> res, const Convolution2DCommon* common, Backend* b) : XPUConvolutionTiledExecutor(res, b) {
+    mProxy.reset(new DenseConvolutionTiledImpl(common, b, mResource.get()));
+}
+
+XPUDenseConvolutionGeneralExecutor::~XPUDenseConvolutionGeneralExecutor() {
+    // Do nothing
+}
+bool XPUDenseConvolutionGeneralExecutor::onClone(Backend* bn, const Op* op, Execution** dst) {
+    if (!mValid) {
+        return false;
+    }
+    if (nullptr == dst) {
+        return true;
+    }
+    auto dense = new XPUDenseConvolutionGeneralExecutor(mResource, op->main_as_Convolution2D()->common(), bn);
+    dense->mProxy->mConvPerfconfig = mProxy->mConvPerfconfig;
+    *dst = dense;
+    return true;
+}
+
+// 计算输出特征图的高度和宽度
+// inputH: 输入特征图高度, inputW: 输入特征图宽度, params: 卷积参数
+std::pair<int, int> calculateOutputSize(int inputH, int inputW,
+                                        const Convolution2DCommonT &params) {
+  // 核心公式：OH = ((IH + 2*padY - kernelY) / strideY) + 1
+  int outputH = (inputH + 2 * params.padY - params.kernelY) / params.strideY + 1;
+  // 核心公式：OW = ((IW + 2*padX - kernelX) / strideX) + 1
+  int outputW = (inputW + 2 * params.padX - params.kernelX) / params.strideX + 1;
+  return {outputH, outputW};
+}
+
+// 对输入特征图进行零填充（CAFFE模式默认零填充）
+// input: 输入特征图 (N, C, H, W)，返回填充后的特征图 (N, C, H+2*padY, W+2*padX)
+std::vector<float> padInput(const std::vector<float> &input, int N, int C,
+                            int H, int W, const Convolution2DCommonT &params) {
+  int padLeft = params.pads[0];
+  int padTop = params.pads[1];
+  int padRight = params.pads[2];
+  int padBottom = params.pads[3];
+
+  // 填充后的高度和宽度
+  int paddedH = H + padTop + padBottom;
+  int paddedW = W + padLeft + padRight;
+
+  // 初始化填充后的特征图，默认值为0（零填充）
+  std::vector<float> paddedInput(N * C * paddedH * paddedW, 0.0f);
+
+  // 将原始输入拷贝到填充后的中心位置
+  for (int n = 0; n < N; ++n) {       // 遍历批次
+    for (int c = 0; c < C; ++c) {     // 遍历通道
+      for (int h = 0; h < H; ++h) {   // 遍历高度
+        for (int w = 0; w < W; ++w) { // 遍历宽度
+          // 原始输入的一维索引
+          int inputIdx = n * C * H * W + c * H * W + h * W + w;
+          // 填充后对应的索引（偏移padTop和padLeft）
+          int paddedIdx = n * C * paddedH * paddedW + c * paddedH * paddedW +
+                          (h + padTop) * paddedW + (w + padLeft);
+          paddedInput[paddedIdx] = input[inputIdx];
+        }
+      }
+    }
+  }
+
+  return paddedInput;
+}
+
+// 卷积算子核心实现
+// input: 输入特征图 (N, inputC, H, W)
+// weight: 卷积核 (outputC, inputC/group, kernelY, kernelX)
+// bias: 偏置 (outputC)，为空则不使用偏置
+// N: 批次大小, inputH/inputW: 输入特征图高/宽
+std::vector<float> conv2d(const std::vector<float> &input,
+                          const std::vector<float> &weight,
+                          const std::vector<float> &bias, int N, int inputH,
+                          int inputW, const Convolution2DCommonT &params) {
+  // 提取核心参数
+  int inputC = params.inputCount;
+  int outputC = params.outputCount;
+  int kernelY = params.kernelY;
+  int kernelX = params.kernelX;
+  int strideY = params.strideY;
+  int strideX = params.strideX;
+  int group = params.group;
+
+  // 基础校验：输入/输出通道数需能被分组数整除
+  if (inputC % group != 0 || outputC % group != 0) {
+    MNN_PRINT("error: inputC:%d, outputC:%d, group:%d", inputC, outputC, group);
+    return {};
+  }
+  int groupInputC = inputC / group;   // 每个分组的输入通道数
+  int groupOutputC = outputC / group; // 每个分组的输出通道数
+
+  // 计算输出特征图尺寸
+  auto outputSize = calculateOutputSize(inputH, inputW, params);
+  int outputH = outputSize.first;
+  int outputW = outputSize.second;
+  MNN_PRINT("outputH:%d, outputW:%d\n", outputH, outputW);
+
+  // 对输入进行零填充
+  std::vector<float> paddedInput =
+      padInput(input, N, inputC, inputH, inputW, params);
+  int paddedH = inputH + params.padY * 2;
+  int paddedW = inputW + params.padX * 2;
+
+  // 初始化输出特征图（默认值0）
+  std::vector<float> output(N * outputC * outputH * outputW, 0.0f);
+
+  // 核心卷积计算逻辑
+  for (int n = 0; n < N; ++n) {            // 遍历批次
+    for (int oc = 0; oc < outputC; ++oc) { // 遍历输出通道
+      int g = oc / groupOutputC; // 当前输出通道所属分组（group=1时恒为0）
+      for (int oh = 0; oh < outputH; ++oh) {   // 遍历输出高度
+        for (int ow = 0; ow < outputW; ++ow) { // 遍历输出宽度
+          float sum = 0.0f;                    // 卷积累加和
+
+          // 遍历当前分组内的输入通道
+          for (int ic = 0; ic < groupInputC; ++ic) {
+            int realIC = g * groupInputC + ic; // 实际输入通道索引
+
+            // 遍历卷积核
+            for (int ky = 0; ky < kernelY; ++ky) {   // 核高度
+              for (int kx = 0; kx < kernelX; ++kx) { // 核宽度
+                // 计算填充后输入的对应位置
+                int ih = oh * strideY + ky; // 输入高度位置
+                int iw = ow * strideX + kx; // 输入宽度位置
+
+                // 边界检查（填充后可省略，保留更健壮）
+                if (ih < 0 || ih >= paddedH || iw < 0 || iw >= paddedW) {
+                  continue;
+                }
+
+                // 计算输入特征图的一维索引
+                int inputIdx = n * inputC * paddedH * paddedW +
+                               realIC * paddedH * paddedW + ih * paddedW + iw;
+
+                // 计算卷积核的一维索引
+                int weightIdx = oc * groupInputC * kernelY * kernelX +
+                                ic * kernelY * kernelX + ky * kernelX + kx;
+
+                // 累加：输入值 × 权重值
+                sum += paddedInput[inputIdx] * weight[weightIdx];
+              }
+            }
+          }
+
+          // 加上偏置（如果有）
+          if (!bias.empty()) {
+            sum += bias[oc];
+          }
+
+          // 激活函数（当前配置无激活，直接赋值）
+          if (params.relu)
+            sum = std::max(0.0f, sum);
+          if (params.relu6)
+            sum = std::min(std::max(0.0f, sum), 6.0f);
+
+          // 赋值到输出特征图
+          int outputIdx = n * outputC * outputH * outputW +
+                          oc * outputH * outputW + oh * outputW + ow;
+          output[outputIdx] = sum;
+        }
+      }
+    }
+  }
+
+  return output;
+}
+
+
+template<typename T>
+void MNNPackC4Common(T* dst, const T* src, size_t area, size_t depth, int* areaOffset) {
+    int depthC4     = depth / 4;
+    int depthRemain = depthC4 * 4;
+    int remain      = depth - depthRemain;
+    int z, x, y;
+    const T* srcChannel[4];
+    const T* srcOffset = src;
+    for(z = 0; z < depthC4; ++z) {
+        auto dstZ = dst + z * areaOffset[1] * 4;
+        for(y = 0; y < 4; ++y) {
+            srcChannel[y] = srcOffset + areaOffset[0] * y;
+        }
+        for(x = 0; x < area; ++x) {
+            for(y = 0; y < 4; ++y) {
+                dstZ[0] = srcChannel[y][x];
+                dstZ++;
+            }
+        }
+        srcOffset += areaOffset[0] * 4;
+    }
+    if(remain > 0){
+        auto dstZ = dst + depthC4 * areaOffset[1] * 4;
+        for(y = 0; y < remain; ++y) {
+            srcChannel[y] = srcOffset + areaOffset[0] * y;
+        }
+        for(x = 0; x < area; ++x) {
+            for(y = 0; y < remain; ++y) {
+                dstZ[0] = srcChannel[y][x];
+                dstZ++;
+            }
+            for(y = remain; y < 4; ++y) {
+                dstZ[0] = 0;
+                dstZ++;
+            }
+        }
+    }
+}
+
+ErrorCode XPUDenseConvolutionGeneralExecutor::onExecute(const std::vector<Tensor *> &inputs, const std::vector<Tensor *> &outputs) {
+    ErrorCode code = NO_ERROR;
+    // auto code = mProxy->onExecute(mInputs, outputs);
+
+    Tensor input_nchw;
+    TensorUtils::copyShape(inputs[0], &input_nchw, true, true);
+    TensorUtils::getDescribe(&input_nchw)->dimensionFormat = MNN::MNN_DATA_FORMAT_NCHW;
+    backend()->onAcquireBuffer(&input_nchw, Backend::STATIC);
+    MNN::XPUTensorConverter::convert(inputs[0], &input_nchw);
+    conv_input_.resize(input_nchw.elementSize());
+    memcpy((void*)conv_input_.data(), (void*)input_nchw.deviceId(), input_nchw.size());
+
+    auto conv_output = conv2d(conv_input_, conv_weight_, conv_bias_, inputs[0]->batch(), inputs[0]->height(), inputs[0]->width(), conv_common_param_);
+    int batch = inputs[0]->batch();
+    int channel = outputs[0]->channel();
+    int height = outputs[0]->height();
+    int width = outputs[0]->width();
+    const int C4 = ((channel + 3) / 4) * 4;
+    const int nc4hw4TotalSize = batch * C4 * height * width;
+    std::vector<float> conv_output_nc4hwc4(nc4hw4TotalSize);
+    MNN_ASSERT(outputs[0]->elementSize() == nc4hw4TotalSize);
+    int areaOffset[2] = {height * width, height*width};
+    MNNPackC4Common<float>(conv_output_nc4hwc4.data(), conv_output.data(),
+                             height * width, channel, areaOffset);
+
+    memcpy((void*)outputs[0]->deviceId(), (void*)conv_output_nc4hwc4.data(), outputs[0]->size());
+    // for(int i = 0; i < nc4hw4TotalSize; ++i) {
+    //     MNN_ASSERT(abs(conv_output_nc4hwc4[i] - ((float*)outputs[0]->deviceId())[i]) < 1e-3);
+    //     if(abs(conv_output_nc4hwc4[i] - ((float*)outputs[0]->deviceId())[i]) > 1e-3) {
+    //         MNN_PRINT("pack error at %d, %f, %f\n", i, conv_output_nc4hwc4[i], ((float*)outputs[0]->deviceId())[i]);
+    //     } // "/model.20/cv3/conv/Conv_output_0"   "/model.24/m.1/Conv_output_0" "/model.21/conv/Conv_output_0" "/model.23/cv3/conv/Conv_output_0" "/model.24/m.2/Conv_output_0"
+    // }
+    return code;
+}
+ErrorCode XPUDenseConvolutionGeneralExecutor::onResize(const std::vector<Tensor *> &inputs, const std::vector<Tensor *> &outputs) {
+    mInputs = {inputs[0], mResource->mWeight.get(), mResource->mBias.get()};
+    auto code = mProxy->onResize(mInputs, outputs);
+    if (NO_ERROR != code) {
+        return code;
+    }
+    return NO_ERROR;
+}
+bool XPUDenseConvolutionGeneralExecutor::initQuantizeResource(std::shared_ptr<ConvolutionCommon::Int8Common> int8Info, std::shared_ptr<XPUConvolution::Resource> resource, int hU, int hP, int lU, int lP, int outputCount, int srcChannel, int kernelSize, int bytes) {
+    int weightLength = hU * lU * hP * lP;
+    resource->mDequantize.bits = 8;
+    resource->lU = lU;
+    resource->hU = hU;
+    resource->lP = lP;
+    resource->hP = hP;
+    MNN_ASSERT(lP == 1);
+    // Save scale bias
+    int dequantCnt = int8Info->alpha.size();
+    int scaleSize = dequantCnt; // real size
+    if (int8Info->asymmetric) {
+        scaleSize = dequantCnt / 2;
+
+    }
+    int blockNum = scaleSize / outputCount;
+    scaleSize = blockNum * hU * hP; // pack size
+    resource->mDequantize.mScaleBias.reset(MNN::Tensor::createDevice<uint8_t>({scaleSize * 2 * bytes}));
+    auto res = resource->backend->onAcquireBuffer(resource->mDequantize.mScaleBias.get(), Backend::STATIC);
+    if (!res) {
+        return false;
+    }
+    int originOffset = 0;
+    auto srcWInt8 = int8Info->weight.get();
+    std::vector<int8_t> blob;
+    if (int8Info->canUseInt4) {
+        // Revert int4 to int8
+        auto size = int8Info->weight.size();
+        blob.resize(int8Info->weight.size() * 2);
+        auto idxBuf = (uint8_t*)srcWInt8;
+        for (int i=0; i<size; ++i) {
+            int val = idxBuf[i];
+            int x1 = val / 16;
+            int x2 = val % 16;
+            blob[2 * i] = x1 - 8;
+            blob[2 * i + 1] = x2 - 8;
+
+        }
+        srcWInt8 = blob.data();
+    }
+    {
+        resource->mWeight.reset(Tensor::createDevice<int8_t>(std::vector<int>{hU, lU * lP, hP}));
+        auto res = resource->backend->onAcquireBuffer(resource->mWeight.get(), Backend::STATIC);
+        if (!res) {
+            return false;
+        }
+        // Reorder weight for int8
+        auto dstWInt8 = resource->mWeight->host<int8_t>();
+        ::memset(dstWInt8, 0, resource->mWeight->usize());
+        for (int y=0; y<outputCount; ++y) {
+            int yo = y / hP;
+            int yi = y % hP;
+            auto srcY = srcWInt8 + y * srcChannel * kernelSize;
+            auto dstY = dstWInt8 + yo * lP * hP * lU + yi;
+            for (int iz=0; iz<srcChannel; ++iz) {
+                for (int k=0; k<kernelSize; ++k) {
+                    int sx = iz * kernelSize + k;
+                    int dx = iz + k * srcChannel;
+                    dstY[dx * hP] = srcY[sx];
+                }
+            }
+        }
+    }
+    auto alphaPtr = resource->mDequantize.mScaleBias->host<float>();
+    auto biasPtr = reinterpret_cast<float*>(reinterpret_cast<uint8_t*>(alphaPtr) + scaleSize * bytes);
+    ::memset(alphaPtr, 0, 2 * scaleSize * bytes);
+    int h = int8Info->alpha.size();
+    if (bytes == 2) {
+        auto core = static_cast<XPUBackend*>(resource->backend)->functions();
+        std::vector<float> tmpAlpha(scaleSize * 2, 0.0f);
+        if (int8Info->asymmetric) {
+            for (int i = 0; i < blockNum; ++i) {
+                auto dstAlpha = tmpAlpha.data() + i * hU * hP;
+                auto srcAlpha = int8Info->alpha.get();
+                for (int j = 0; j < outputCount; ++j) {
+                    int scaleIndex = j * blockNum + i;
+                    dstAlpha[j] = srcAlpha[2 * scaleIndex + 1];
+                    dstAlpha[j + scaleSize] = srcAlpha[2 * scaleIndex] + (float)originOffset * dstAlpha[j];
+                }
+            }
+        } else {
+            for (int i = 0; i < blockNum; ++i) {
+                auto dstAlpha = tmpAlpha.data() + i * hU * hP;
+                auto srcAlpha = int8Info->alpha.get();
+                for (int j = 0; j < outputCount; ++j) {
+                    int scaleIndex = j * blockNum + i;
+                    dstAlpha[j] = srcAlpha[scaleIndex];
+                    dstAlpha[j + scaleSize] = (float)originOffset * dstAlpha[j];
+                }
+            }
+        }
+        core->MNNFp32ToLowp(tmpAlpha.data(), reinterpret_cast<int16_t*>(alphaPtr), scaleSize * 2);
+    } else {
+        if (int8Info->asymmetric) {
+            for (int i = 0; i < blockNum; ++i) {
+                auto dstAlpha = alphaPtr + i * hU * hP;
+                auto dstBias  = biasPtr + i * hU * hP;
+                auto srcAlpha = int8Info->alpha.get();
+                for (int j = 0; j < outputCount; ++j) {
+                    int scaleIndex = j * blockNum + i;
+                    dstAlpha[j] = srcAlpha[2 * scaleIndex + 1];
+                    dstBias[j] = srcAlpha[2 * scaleIndex] + (float)originOffset * dstAlpha[j];
+                }
+            }
+        } else {
+            for (int i = 0; i < blockNum; ++i) {
+                auto dstAlpha = alphaPtr + i * hU * hP;
+                auto dstBias  = biasPtr + i * hU * hP;
+                auto srcAlpha = int8Info->alpha.get();
+                for (int j = 0; j < outputCount; ++j) {
+                    int scaleIndex = j * blockNum + i;
+                    dstAlpha[j] = srcAlpha[scaleIndex];
+                    dstBias[j] = (float)originOffset * dstAlpha[j];
+                }
+            }
+        }
+    }
+    return true;
+}
+
+void XPUDenseConvolutionGeneralExecutor::selectLowMemoryMatmulFunc(lowMemoryMatmulUnit* matmulUnit, lowMemoryMatmulRemain* matmulRemain, float* weightBytes, int32_t weightQuantBits, const XPUCoreFunctions* core) {
+    if (weightQuantBits == 8) {
+        *matmulUnit = core->MNNPackedMatMul_int8;
+        *matmulRemain = core->MNNPackedMatMulRemain_int8;
+        *weightBytes  = 1;
+    }
+}
+void XPUDenseConvolutionGeneralExecutor::initWeight(float *dest, const float *source, float* cache, int depth, int outputCount, int kernelSize, const XPUCoreFunctions* function) {
+    XPUConvolutionTiledExecutor::initWeight(source, cache, depth, outputCount, kernelSize, function);
+    function->MNNPackForMatMul_B(dest, cache, outputCount, kernelSize * depth, true);
+
 }
 
 ErrorCode ConvolutionTiledExecutorMultiInput::onExecute(const std::vector<Tensor*>& inputs,

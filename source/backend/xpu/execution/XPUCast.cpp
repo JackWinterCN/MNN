@@ -225,5 +225,5 @@ Execution *XPUCastCreator::onCreate(const std::vector<Tensor *> &inputs, const s
 }
 
 // REGISTER_CPU_OP_CREATOR(XPUCastCreator, OpType_Cast);
-REGISTER_XPU_OP_CUSTOMIZED_CREATOR(XPUCastCreator, OpType_Cast);
+// REGISTER_XPU_OP_CUSTOMIZED_CREATOR(XPUCastCreator, OpType_Cast);
 } // namespace MNN

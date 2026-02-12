@@ -12,14 +12,16 @@ namespace XPU {
 
 std::shared_ptr<XPUMemNode> XPUMemPool::alloc(size_t size, bool separate) {
   if (!separate) {
-    auto iter = mFreeList.lower_bound(size);
-    if (iter != mFreeList.end()) {
-      auto node = iter->second;
-      mFreeList.erase(iter);
-      MNN_PRINT("[XPU] XPUMemPool reuse addr: 0x%lx size: %lu\n",
-                node->physical_addr, node->size);
-      return node;
-    }
+    // FIX: this reuse strategy is not correct, it may destroy the used memory
+    // auto iter = mFreeList.lower_bound(size);
+    // if (iter != mFreeList.end()) {
+    //   auto node = iter->second;
+    //   mFreeList.erase(iter);
+    //   MNN_PRINT("[XPU] XPUMemPool reuse addr: 0x%lx size: %lu\n",
+    //             node->physical_addr, node->size);
+    //   return node;
+    // }
+  
     // TODO: this branch may lead to dangling pointer, because the node in
     // FreeLists may be used by other operator, and the following code will free
     // the memory of the node, which may cause dangling pointer.

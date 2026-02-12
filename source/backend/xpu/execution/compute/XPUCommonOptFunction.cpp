@@ -75,6 +75,37 @@ void MNNPackC4Common(T* dst, const T* src, size_t area, size_t depth, int* areaO
     }
 }
 
+template<typename T>
+void MNNUnpackC4Common(T* dst, const T* src, size_t area, size_t depth, int* areaOffset) {
+    int depthC4     = depth / 4;
+    int depthRemain = depthC4 * 4;
+    int remain      = depth - depthRemain;
+    int z, x, y;
+    const T* srcChannel[4];
+    const T* srcOffset = src;
+    for(z = 0; z < depthC4; ++z) {
+        for(y = 0; y < 4; ++y) {
+            auto dstZ = dst + (z * 4 + y) * areaOffset[1];
+            srcChannel[y] = srcOffset + y;
+            for(x = 0; x < area; ++x) {
+                dstZ[x] = srcChannel[y][0];
+                srcChannel[y] += 4;
+            }
+        }
+        srcOffset += areaOffset[0] * 4;
+    }
+    if(remain > 0){
+        auto dstZ = dst + depthC4 * areaOffset[1] * 4;
+        for(y = 0; y < remain; ++y) {
+            srcChannel[y] = srcOffset + y;
+            for(x = 0; x < area; ++x) {
+                dstZ[x] = srcChannel[y][0];
+                srcChannel[y] += 4;
+            }
+            dstZ += areaOffset[1];
+        }
+    }
+}
 void MNNGetMatMulPackMode(int* eP, int *lP, int* hP) {
     *eP = 16;
     *lP = 1;
@@ -238,6 +269,10 @@ void MNNReluWithSlopeChannel(float* dst, const float* src, const float* slope, s
 
 void MNNPackC4(float* dst, const float* src, size_t area, size_t depth, int* areaOffset) {
     MNNPackC4Common<float>(dst, src, area, depth, areaOffset);
+}
+
+void MNNUnpackC4(float* dst, const float* src, size_t area, size_t depth, int* areaOffset) {
+    MNNUnpackC4Common<float>(dst, src, area, depth, areaOffset);
 }
 
 void MNNExpC8(float* dest, const float* source, float* offset, const float* parameters, size_t countC8) {
@@ -625,7 +660,7 @@ void MNNXPUCoreFunctionInit() {
     gCoreFunction->pack = 4;
     // FIXME: MNNPackTranspose and MNNUnpackTranspose is reverted
 //     gCoreFunction->MNNPackCUnit = MNNPackC4;
-//     gCoreFunction->MNNUnpackCUnit = MNNUnpackC4;
+    gCoreFunction->MNNUnpackCUnit = MNNUnpackC4;
 //     gCoreFunction->MNNUnpackCUnitTranspose = MNNPackTranspose;
 //     gCoreFunction->MNNPackCUnitTranspose = MNNUnpackTranspose;
 //     gCoreFunction->MNNPackCUnitInt8 = decltype(gCoreFunction->MNNPackCUnitInt8)(MNNPackC4Uint8);

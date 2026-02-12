@@ -54,7 +54,7 @@ static Execution* _createUnit(const Tensor* input, const Tensor* output, Backend
     // }
 // #endif
     // if (cpuBackend->getRuntime()->hint().winogradMemoryUsed == 0 || (!ConvolutionWinogradBridge::canUseWinograd(common))) {
-        return new XPUDenseConvolutionTiledExecutor(common, backend, originWeight, originWeightSize, bias, biasSize, nullptr);
+        return new XPUDenseConvolutionGeneralExecutor(common, backend, originWeight, originWeightSize, bias, biasSize, nullptr);
     // }
     // XPUPerfConfig convPerfconfig = DenseConvolutionTiledExecutor::bestTileConvolutionConfig(common, input, output, cpuBackend->threadNumber(), backend);
     // auto winogradConfig = ConvolutionWinogradBridge::bestWinogradUnit(common, input, output, cpuBackend->threadNumber(), backend, convPerfconfig);
@@ -81,7 +81,7 @@ Execution* XPUConvolutionFloatFactory::create(const std::vector<Tensor*>& inputs
     //     return nullptr;
     // }
 #else
-    // bool lowMemory = false;
+    lowMemory = false;
 #endif
 
 // #ifdef MNN_CPU_WEIGHT_DEQUANT_GEMM
@@ -105,27 +105,27 @@ Execution* XPUConvolutionFloatFactory::create(const std::vector<Tensor*>& inputs
     supportSparse = !onlySSENotAVX && bytes == 4;
 #endif
     if (nullptr != conv2d->quanParameter()) {
-        // bool forceFloat = false;
-        // if (!supportSparse && conv2d->quanParameter()->index() != nullptr) {
-        //     // The weight is storage as float sparse, but the backend don't support sparse compute, expand it
-        //     forceFloat = true;
-        // }
-        // quanCommon = ConvolutionCommon::load(op, backend, forceFloat, lowMemory);
-        // if (nullptr == quanCommon) {
-        //     MNN_ERROR("Memory not Enough, can't extract IDST Convolution: %s \n", op->name()->c_str());
-        //     return nullptr;
-        // }
+        bool forceFloat = false;
+        if (!supportSparse && conv2d->quanParameter()->index() != nullptr) {
+            // The weight is storage as float sparse, but the backend don't support sparse compute, expand it
+            forceFloat = true;
+        }
+        quanCommon = ConvolutionCommon::load(op, backend, forceFloat, lowMemory);
+        if (nullptr == quanCommon) {
+            MNN_ERROR("Memory not Enough, can't extract IDST Convolution: %s \n", op->name()->c_str());
+            return nullptr;
+        }
 
-        // if (conv2d->quanParameter()->has_scaleInt()) {
-        //     if (bytes < 4) {
-        //         // From BF16 / FP16
-        //         return nullptr;
-        //     }
-        //     return ConvolutionIntFactory::create(inputs[0], outputs[0], op, backend, quanCommon.get());
-        // }
-        // // Back to float
-        // originWeight     = quanCommon->weightFloat.get();
-        // originWeightSize = quanCommon->weightFloat.size();
+        if (conv2d->quanParameter()->has_scaleInt()) {
+            if (bytes < 4) {
+                // From BF16 / FP16
+                return nullptr;
+            }
+            // return ConvolutionIntFactory::create(inputs[0], outputs[0], op, backend, quanCommon.get());
+        }
+        // Back to float
+        originWeight     = quanCommon->weightFloat.get();
+        originWeightSize = quanCommon->weightFloat.size();
     } else if (nullptr == conv2d->weight() || nullptr == conv2d->bias()) {
         MNN_ERROR("%s has no weight or bias. The model may be benchmark model, please revert the weight/bias firstly\n", op->name()->c_str());
         return nullptr;

@@ -962,7 +962,7 @@ void Calibration::_insertScale() {
         } else if (_weightQuantizeMethod == "ADMM") {
             QuantizeWeightADMM(originWeight, weightSize, quantizedWeight.data(), quantizedWeightScale.data(), outputChannel, _weightClampValue);
         }
-        param->quanParameter = IDSTEncoder::encode(originWeight, quantizedWeightScale, weightSize/channles, channles, false, quantizedWeight.data(), -_weightClampValue);
+        param->quanParameter = IDSTEncoder::encode(nullptr, quantizedWeightScale, weightSize/channles, channles, false, quantizedWeight.data(), -_weightClampValue);
         param->quanParameter->scaleIn = inputScale;
         param->quanParameter->scaleOut = outputScale;
         if (param->common->relu6) {

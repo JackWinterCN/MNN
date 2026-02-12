@@ -312,7 +312,10 @@ ErrorCode XPUTensorConverter::convert(const Tensor* input, const Tensor* output,
     int area = std::get<1>(tup);
     int batch = std::get<0>(tup);
     int channel = std::get<2>(tup);
-    auto code = convert(ib.host, ob.host, source, dest, batch, area, channel, byteNum, core, tId, numberThread);
+    // auto code = convert(ib.host, ob.host, source, dest, batch, area, channel, byteNum, core, tId, numberThread);
+    auto code = convert((void *)(input->deviceId()),
+                        (void *)(output->deviceId()), source, dest, batch, area,
+                        channel, byteNum, core, tId, numberThread);
     if (NO_ERROR != code) {
         MNN_ERROR("Error in CPUTensorConver\n");
         return code;

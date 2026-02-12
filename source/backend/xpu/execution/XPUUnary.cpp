@@ -585,7 +585,7 @@ public:
     }
 };
 
-REGISTER_XPU_OP_CUSTOMIZED_CREATOR(XPUUnaryCreator, OpType_UnaryOp);
+// REGISTER_XPU_OP_CUSTOMIZED_CREATOR(XPUUnaryCreator, OpType_UnaryOp);
 
 } // namespace XPU
 } // namespace MNN

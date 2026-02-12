@@ -11,6 +11,7 @@
 
 
 #include <functional>
+#include <vector>
 #include "backend/xpu/execution/XPUConvolution.hpp"
 #include "XPUConvolutionTiledExecutor.hpp"
 // Tiled Slide Window or Im2Col + GEMM
@@ -58,6 +59,38 @@ public:
 protected:
     DequantizeCache mWeightCache;
     std::shared_ptr<DenseConvolutionTiledImpl> mProxy;
+};
+
+
+class XPUDenseConvolutionGeneralExecutor : public XPUConvolutionTiledExecutor {
+public:
+    XPUDenseConvolutionGeneralExecutor(const Convolution2DCommon *common, Backend *b, const float *originWeight,
+                                  size_t originWeightSize, const float *bias, size_t biasSize, std::shared_ptr<ConvolutionCommon::Int8Common>);
+
+    XPUDenseConvolutionGeneralExecutor(std::shared_ptr<XPUConvolution::Resource> res, const Convolution2DCommon *common, Backend* b);
+    virtual ~XPUDenseConvolutionGeneralExecutor();
+
+    virtual ErrorCode onExecute(const std::vector<Tensor *> &inputs, const std::vector<Tensor *> &outputs) override;
+    virtual ErrorCode onResize(const std::vector<Tensor *> &inputs, const std::vector<Tensor *> &outputs) override;
+    virtual bool onClone(Backend* bn, const Op* op, Execution** dst) override;
+    void initWeight(float *dest, const float *source, float* cache, int depth, int outputCount, int kernelSize, const XPUCoreFunctions* function);
+    static XPUPerfConfig bestTileConvolutionConfig(const Convolution2DCommon *common, const Tensor *inputTensor,
+                                          const Tensor *outputTensor, int threadNumber, Backend* b) {
+        return DenseConvolutionTiledImpl::bestTileConvolutionConfig(common, inputTensor, outputTensor, threadNumber, b);
+    }
+    static bool initQuantizeResource(std::shared_ptr<ConvolutionCommon::Int8Common> int8Info, std::shared_ptr<XPUConvolution::Resource> resource, int hU, int hP, int lU, int lP, int outputCount, int srcChannel, int kernelSize, int bytes);
+    static void selectLowMemoryMatmulFunc(lowMemoryMatmulUnit* matmulUnit, lowMemoryMatmulRemain* matmulRemain, float* weightBytes, int32_t weightQuantBits, const XPUCoreFunctions* core);
+    struct DequantizeCache {
+        std::shared_ptr<MNN::Tensor> weight;
+        std::shared_ptr<MNN::Tensor> weightInt8;
+    };
+protected:
+    DequantizeCache mWeightCache;
+    std::shared_ptr<DenseConvolutionTiledImpl> mProxy;
+    Convolution2DCommonT conv_common_param_;
+    std::vector<float> conv_bias_;
+    std::vector<float> conv_weight_;
+    std::vector<float> conv_input_;
 };
 
 class ConvolutionTiledExecutorMultiInput : public Execution {

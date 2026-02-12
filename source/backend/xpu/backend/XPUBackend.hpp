@@ -8,6 +8,7 @@
 #include <core/Execution.hpp>
 #include <core/TensorUtils.hpp>
 #include "core/BufferAllocator.hpp"
+#include <MNN/MNNForwardType.h>
 #include "MNN_generated.h"
 #include "backend/xpu/execution/compute/XPUCommonOptFunction.hpp"
 
@@ -67,6 +68,9 @@ public:
   BackendConfig::PrecisionMode precisionMode() const {
     return mPrecision;
   }
+  BackendConfig::MemoryMode memoryMode() const {
+    return mMemory;
+  }
   void computeDivideSizes(int size, int *dst, float avgDiv = 0) const {
     // if (mGroupWithComputeRate.size() <= 1 ||
     //     (avgDiv > 0 && avgDiv < mComputeI)) {
@@ -111,6 +115,7 @@ private:
   static std::map<OpType, OpCreator *> mOpCreatorsMap;
   const XPURuntime *mRuntime;
   BackendConfig::PrecisionMode mPrecision;
+  BackendConfig::MemoryMode mMemory{BackendConfig::MemoryMode::Memory_Low};
   std::shared_ptr<XPU::XPUMemPool> mExecutionBufferPool;
   XPU::XPUCoreFunctions *mCoreFunctions;
   // CoreInt8Functions *mInt8CoreFunctions;
