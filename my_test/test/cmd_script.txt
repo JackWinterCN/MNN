@@ -9,3 +9,9 @@ git apply --ignore-space-change --ignore-whitespace
 ../../build/xpu_yolov5s.out yolov5s_v7_offline_quant_no_encode.mnn ./testcat.jpg 0 2 2
 
 gdb --args ../../build/xpu_yolov5s.out yolov5s_v7.mnn ./testcat.jpg 20 1 1
+
+
+// 运行下面命令，将 Vivado 的 arm 编译器加入环境变量。
+source /tools/Xilinx/Vivado/2020.1/settings64.sh
+// 若使用 Vitis 的 arm 编译器则使用下面的命令设置环境变量。
+source /tools/Xilinx/Vitis/2020.1/settings64.sh
