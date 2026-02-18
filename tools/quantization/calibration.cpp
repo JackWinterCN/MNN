@@ -1083,8 +1083,8 @@ void Calibration::_computeQuantError() {
                  const std::tuple<std::string, float, float> &b) {
                 return std::get<1>(a) < std::get<1>(b);
               });
-    MNN_PRINT("Top 20 error tensors:\n");
-    for (int i = 0; i < 20 && i < top_error_tensors.size(); i++) {
+    MNN_PRINT("Top 100 error tensors:\n");
+    for (int i = 0; i < 100 && i < top_error_tensors.size(); i++) {
         auto name = std::get<0>(top_error_tensors[i]);
         auto cosDistance = std::get<1>(top_error_tensors[i]);
         auto overflowRatio = std::get<2>(top_error_tensors[i]);

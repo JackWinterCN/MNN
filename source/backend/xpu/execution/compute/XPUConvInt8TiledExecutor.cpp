@@ -1560,7 +1560,8 @@ static std::pair<int, int> calculateOutputSize(int inputH, int inputW,
 
 // 对输入特征图进行零填充（CAFFE模式默认零填充）
 // input: 输入特征图 (N, C, H, W)，返回填充后的特征图 (N, C, H+2*padY, W+2*padX)
-static std::vector<float> padInput(const std::vector<float> &input, int N, int C,
+template <typename T>
+std::vector<T> padInput(const std::vector<T> &input, int N, int C,
                             int H, int W, const Convolution2DCommonT &params) {
   int padLeft = params.pads[0];
   int padTop = params.pads[1];
@@ -1572,7 +1573,7 @@ static std::vector<float> padInput(const std::vector<float> &input, int N, int C
   int paddedW = W + padLeft + padRight;
 
   // 初始化填充后的特征图，默认值为0（零填充）
-  std::vector<float> paddedInput(N * C * paddedH * paddedW, 0.0f);
+  std::vector<T> paddedInput(N * C * paddedH * paddedW, 0.0f);
 
   // 将原始输入拷贝到填充后的中心位置
   for (int n = 0; n < N; ++n) {       // 遍历批次
@@ -1627,7 +1628,7 @@ static std::vector<float> conv2d(const std::vector<float> &input,
 
   // 对输入进行零填充
   std::vector<float> paddedInput =
-      padInput(input, N, inputC, inputH, inputW, params);
+      padInput<float>(input, N, inputC, inputH, inputW, params);
   int paddedH = inputH + params.padY * 2;
   int paddedW = inputW + params.padX * 2;
 
@@ -1672,6 +1673,106 @@ static std::vector<float> conv2d(const std::vector<float> &input,
             }
           }
 
+          // 加上偏置（如果有）
+          if (!bias.empty()) {
+            sum += bias[oc];
+          }
+
+          // 激活函数（当前配置无激活，直接赋值）
+          if (params.relu)
+            sum = std::max(0.0f, sum);
+          if (params.relu6)
+            sum = std::min(std::max(0.0f, sum), 6.0f);
+
+          // 赋值到输出特征图
+          int outputIdx = n * outputC * outputH * outputW +
+                          oc * outputH * outputW + oh * outputW + ow;
+          output[outputIdx] = sum;
+        }
+      }
+    }
+  }
+
+  return output;
+}
+
+static std::vector<float> conv2d_int8(const std::vector<int8_t> &input,
+                          const std::vector<int8_t> &weight,
+                          const std::vector<float> &bias, 
+                          const std::vector<float> &out_scales,
+                          int N, int inputH,
+                          int inputW, const Convolution2DCommonT &params) {
+  // 提取核心参数
+  int inputC = params.inputCount;
+  int outputC = params.outputCount;
+  int kernelY = params.kernelY;
+  int kernelX = params.kernelX;
+  int strideY = params.strideY;
+  int strideX = params.strideX;
+  int group = params.group;
+
+  // 基础校验：输入/输出通道数需能被分组数整除
+  if (inputC % group != 0 || outputC % group != 0) {
+    MNN_PRINT("error: inputC:%d, outputC:%d, group:%d", inputC, outputC, group);
+    return {};
+  }
+  int groupInputC = inputC / group;   // 每个分组的输入通道数
+  int groupOutputC = outputC / group; // 每个分组的输出通道数
+
+  // 计算输出特征图尺寸
+  auto outputSize = calculateOutputSize(inputH, inputW, params);
+  int outputH = outputSize.first;
+  int outputW = outputSize.second;
+  MNN_PRINT("outputH:%d, outputW:%d\n", outputH, outputW);
+
+  // 对输入进行零填充
+  std::vector<int8_t> paddedInput =
+      padInput<int8_t>(input, N, inputC, inputH, inputW, params);
+  int paddedH = inputH + params.padY * 2;
+  int paddedW = inputW + params.padX * 2;
+
+  // 初始化输出特征图（默认值0）
+  std::vector<float> output(N * outputC * outputH * outputW, 0.0f);
+
+  // 核心卷积计算逻辑
+  for (int n = 0; n < N; ++n) {            // 遍历批次
+    for (int oc = 0; oc < outputC; ++oc) { // 遍历输出通道
+      int g = oc / groupOutputC; // 当前输出通道所属分组（group=1时恒为0）
+      for (int oh = 0; oh < outputH; ++oh) {   // 遍历输出高度
+        for (int ow = 0; ow < outputW; ++ow) { // 遍历输出宽度
+          float sum = 0.0f;                    // 卷积累加和
+
+          // 遍历当前分组内的输入通道
+          for (int ic = 0; ic < groupInputC; ++ic) {
+            int realIC = g * groupInputC + ic; // 实际输入通道索引
+
+            // 遍历卷积核
+            for (int ky = 0; ky < kernelY; ++ky) {   // 核高度
+              for (int kx = 0; kx < kernelX; ++kx) { // 核宽度
+                // 计算填充后输入的对应位置
+                int ih = oh * strideY + ky; // 输入高度位置
+                int iw = ow * strideX + kx; // 输入宽度位置
+
+                // 边界检查（填充后可省略，保留更健壮）
+                if (ih < 0 || ih >= paddedH || iw < 0 || iw >= paddedW) {
+                  continue;
+                }
+
+                // 计算输入特征图的一维索引
+                int inputIdx = n * inputC * paddedH * paddedW +
+                               realIC * paddedH * paddedW + ih * paddedW + iw;
+
+                // 计算卷积核的一维索引
+                int weightIdx = oc * groupInputC * kernelY * kernelX +
+                                ic * kernelY * kernelX + ky * kernelX + kx;
+
+                // 累加：输入值 × 权重值
+                sum += (float)paddedInput[inputIdx] * (float)weight[weightIdx];
+              }
+            }
+          }
+
+          sum *= out_scales[oc];
           // 加上偏置（如果有）
           if (!bias.empty()) {
             sum += bias[oc];
@@ -1766,12 +1867,17 @@ DenseConvInt8TiledGeneralExecutor::DenseConvInt8TiledGeneralExecutor(Backend* ba
     int ic = convOp->common()->inputCount();
 
     conv_bias_.assign(convOp->bias()->data(), convOp->bias()->data() + oc);
-    std::vector<int8_t> init_weight(quanCommon->weight.get(), quanCommon->weight.get() + quanCommon->weight.size());
-    std::vector<float> init_alpha(quanCommon->alpha.get(), quanCommon->alpha.get() + quanCommon->alpha.size());
-    conv_weight_.resize(init_weight.size());
-    for (int i = 0; i < init_weight.size(); ++i) {
-        conv_weight_[i] = init_weight[i] * init_alpha[i/(ic*kernelCount)];
+    init_weight_.assign(quanCommon->weight.get(), quanCommon->weight.get() + quanCommon->weight.size());
+    init_alpha_.assign(quanCommon->alpha.get(), quanCommon->alpha.get() + quanCommon->alpha.size());
+    conv_weight_.resize(init_weight_.size());
+    for (int i = 0; i < init_weight_.size(); ++i) {
+        conv_weight_[i] = init_weight_[i] * init_alpha_[i/(ic*kernelCount)];
     }
+    out_scales_.assign(init_alpha_.begin(), init_alpha_.end());
+    for (int i = 0; i < out_scales_.size(); ++i) {
+        out_scales_[i] =  out_scales_[i] * convOp->quanParameter()->scaleIn();
+    }
+    scale_in_ = convOp->quanParameter()->scaleIn();
 
     int blockNum = 1;
     if (quanCommon) {
@@ -2470,8 +2576,22 @@ ErrorCode DenseConvInt8TiledGeneralExecutor::onExecute(const std::vector<Tensor*
     MNN::XPUTensorConverter::convert(inputs[0], &input_nchw);
     conv_input_.resize(input_nchw.elementSize());
     memcpy((void*)conv_input_.data(), (void*)input_nchw.deviceId(), input_nchw.size());
-
-    auto conv_output = conv2d(conv_input_, conv_weight_, conv_bias_, inputs[0]->batch(), inputs[0]->height(), inputs[0]->width(), conv_common_param_);
+    std::vector<int8_t> conv_input_int8_(conv_input_.size());
+    std::vector<float> conv_output;
+    int8_t max_temp = 0;
+    if (scale_in_ != 0) {
+        for (int i = 0; i < conv_input_.size(); ++i) {
+            conv_input_int8_[i] = (int8_t)(conv_input_[i] / scale_in_);
+            if (abs(conv_input_int8_[i]) > max_temp) {
+                max_temp = abs(conv_input_int8_[i]);
+                MNN_PRINT("max_temp: %d\n", max_temp);
+            }
+        }
+        // auto conv_output_temp = conv2d(conv_input_, conv_weight_, conv_bias_, inputs[0]->batch(), inputs[0]->height(), inputs[0]->width(), conv_common_param_);
+        conv_output = conv2d_int8(conv_input_int8_, init_weight_, conv_bias_, out_scales_, inputs[0]->batch(), inputs[0]->height(), inputs[0]->width(), conv_common_param_);
+    } else {
+        conv_output = conv2d(conv_input_, conv_weight_, conv_bias_, inputs[0]->batch(), inputs[0]->height(), inputs[0]->width(), conv_common_param_);
+    }
     int batch = inputs[0]->batch();
     int channel = outputs[0]->channel();
     int height = outputs[0]->height();

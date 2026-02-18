@@ -142,6 +142,10 @@ private:
     std::vector<float> conv_bias_;
     std::vector<float> conv_weight_;
     std::vector<float> conv_input_;
+    std::vector<int8_t> init_weight_;
+    std::vector<float> init_alpha_;
+    std::vector<float> out_scales_;
+    float scale_in_;
 #ifdef MNN_KLEIDIAI_ENABLED
     KleidiAI::AccelType mAccelType = KleidiAI::AccelType::ACC_TYPE_NUMBER;
 #endif
