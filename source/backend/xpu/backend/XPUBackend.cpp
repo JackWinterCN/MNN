@@ -13,6 +13,7 @@ std::map<OpType, XPUBackend::OpCreator*> XPUBackend::mOpCreatorsMap;
 XPURuntime::XPURuntime(const Backend::Info &info) {
   MNN_PRINT("[XPU] XPURuntime().\n");
   MNNXPUCoreFunctionInit();
+  MNNXPUCoreInt8FunctionInit();
   mInfo = info;
   BackendConfig::PrecisionMode precision = BackendConfig::Precision_Normal;
   BackendConfig::PowerMode power = BackendConfig::Power_Normal;
@@ -51,6 +52,7 @@ XPUBackend::XPUBackend(const XPURuntime *runtime) : Backend(MNN_FORWARD_XPU) {
 
   mExecutionBufferPool.reset(new XPU::XPUMemPool);
   mCoreFunctions = MNNGetXPUCoreFunctions();
+  mInt8CoreFunctions = MNNXPUGetInt8CoreFunctions();
 }
 XPUBackend::~XPUBackend() {
   mExecutionBufferPool->clear();
@@ -98,6 +100,44 @@ ErrorCode XPUBackend::onResizeEnd() {
   return NO_ERROR;
 }
 
+size_t XPUBackend::getTensorSize(const Tensor* tensor, bool multiBytes) const {
+    auto core = mCoreFunctions;
+    size_t dataSize = 1;
+    auto des = TensorUtils::getDescribe(tensor);
+    for (int i = 0; i < tensor->dimensions(); i++) {
+        size_t currentDimSize = tensor->length(i);
+        if (des->dimensionFormat == MNN_DATA_FORMAT_NC4HW4 && 1 == i) {
+            currentDimSize = UP_DIV(currentDimSize, core->pack) * core->pack;
+        }
+        dataSize *= currentDimSize;
+    }
+    if (multiBytes) {
+        size_t bytes = tensor->getType().bytes();
+        if (TensorUtils::getDescribe(tensor)->quantAttr != nullptr) {
+            if (TensorUtils::getDescribe(tensor)->type == DataType_DT_FLOAT) {
+                bytes = 4;
+            } else {
+                bytes = 1;
+            }
+        }
+        return dataSize * bytes;
+    }
+    return dataSize;
+}
+
+size_t XPUBackend::getBytes(const Backend* backend, const Tensor* output) {
+    size_t bytes = output->getType().bytes();
+    auto core = static_cast<const XPUBackend*>(backend)->functions();
+    auto quant = TensorUtils::getDescribe(output)->quantAttr.get();
+    if (output->getType().code == halide_type_float) {
+        bytes = core->bytes;
+    }
+    if (nullptr != quant && TensorUtils::getDescribe(output)->type == DataType_DT_INT8) {
+        bytes = 1;
+    }
+    return bytes;
+}
+
 Backend::MemObj *XPUBackend::onAcquire(const Tensor *tensor,
                                        StorageType storageType) {
   auto tensorShape = XPU::tensorShapeFormat(tensor);
@@ -106,20 +146,20 @@ Backend::MemObj *XPUBackend::onAcquire(const Tensor *tensor,
   int W = tensorShape.at(2);
   int C = tensorShape.at(3);
 
-  size_t size;
-  if (MNN_DATA_FORMAT_NC4HW4 == TensorUtils::getDescribe(tensor)->dimensionFormat &&
-      tensor->dimensions() >= 2) {
-    auto alignC = ROUND_UP(C, 4);
-    // increment of height and width
-    auto hR = ROUND_UP(H + 3, 4) - H;
-    auto wR = ROUND_UP(W + 3, 4) - W;
-    size = N * alignC * W * H;
-    size = size + hR * W * 4 + wR * 4;
-  } else {
-    size = N * H * W * C;
-    size = ROUND_UP(size, 4);
-  }
-  size = ROUND_UP(size, 2);
+  size_t size = tensor->size();;
+  // if (MNN_DATA_FORMAT_NC4HW4 == TensorUtils::getDescribe(tensor)->dimensionFormat &&
+  //     tensor->dimensions() >= 2) {
+  //   auto alignC = ROUND_UP(C, 4);
+  //   // increment of height and width
+  //   auto hR = ROUND_UP(H + 3, 4) - H;
+  //   auto wR = ROUND_UP(W + 3, 4) - W;
+  //   size = N * alignC * W * H;
+  //   size = size + hR * W * 4 + wR * 4;
+  // } else {
+  //   size = N * H * W * C;
+  //   size = ROUND_UP(size, 4);
+  // }
+  // size = ROUND_UP(size, 2);
   float typeSize = getBytes(tensor);
 
   MNN_PRINT("[XPU] XPUBackend::onAcquire() storageType:%d, NHWC:[%d, %d, %d, %d], "
@@ -130,9 +170,13 @@ Backend::MemObj *XPUBackend::onAcquire(const Tensor *tensor,
     MNN_ERROR("not support storageType %d\n", storageType);
     return nullptr;
   }
-  auto node = mExecutionBufferPool->alloc(size * typeSize);
+  auto node = mExecutionBufferPool->alloc(size);
   ((Tensor *)tensor)->buffer().device = reinterpret_cast<uint64_t>(node->physical_addr);
   return new XPU::XPUDeviceMemObj(node, mExecutionBufferPool.get());
+}
+
+const Runtime* XPUBackend::getRuntime() {
+    return mRuntime;
 }
 
 bool XPUBackend::onClearBuffer() {
@@ -149,11 +193,11 @@ void XPUBackend::copyFromDevice(const Tensor* srcTensor, const Tensor* dstTensor
     bool directCopy = (srcDimensionFormat == dstDimensionFormat || srcTensor->dimensions() <= 1)
                       //  && MNN::MNN_DATA_FORMAT_NC4HW4 != dstDimensionFormat && MNN_DATA_FORMAT_NC4HW4 != srcDimensionFormat
                        && (XPU::getDataType(srcTensor) == XPU::getDataType(dstTensor));
-    if (mPrecision != BackendConfig::Precision_High) { // Fp16
-        if (dstTensor->getType().code == halide_type_float) {
-            directCopy = false;
-        }
-    }
+    // if (mPrecision != BackendConfig::Precision_High) { // Fp16
+    //     if (dstTensor->getType().code == halide_type_float) {
+    //         directCopy = false;
+    //     }
+    // }
 
     if (directCopy) {
       void *hostPtr = dstTensor->host<float>();
@@ -179,11 +223,11 @@ void XPUBackend::copyToDevice(const Tensor* srcTensor, const Tensor* dstTensor) 
     bool directCopy = (srcDimensionFormat == dstDimensionFormat || srcTensor->dimensions() <= 1)
                       //  && MNN_DATA_FORMAT_NC4HW4 != dstDimensionFormat && MNN_DATA_FORMAT_NC4HW4 != srcDimensionFormat
                        && (XPU::getDataType(srcTensor) == XPU::getDataType(dstTensor));
-    if (mPrecision != BackendConfig::Precision_High) { // Fp16
-        if (dstTensor->getType().code == halide_type_float) {
-            directCopy = false;
-        }
-    }
+    // if (mPrecision != BackendConfig::Precision_High) { // Fp16
+    //     if (dstTensor->getType().code == halide_type_float) {
+    //         directCopy = false;
+    //     }
+    // }
     if(directCopy){
       memcpy((void *)dstTensor->deviceId(), hostPtr, needSize);
       MNN_PRINT("[XPU] (host->device) size: %d bytes, %p -> %p\n", needSize,

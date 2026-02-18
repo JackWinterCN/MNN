@@ -91,7 +91,7 @@ std::pair<size_t, std::pair<size_t, size_t>> XPUConvolutionTiledExecutor::comput
     return std::make_pair(total, std::make_pair(stride, kernelSize * maxLine));
 }
 
-void XPUConvolutionTiledExecutor:: setIm2ColParameter(ConvolutionCommon::Im2ColParameter& dstIm2ColParamter, const Convolution2DCommon* convCommon, Tensor* input, Tensor* output, int padX, int padY, const XPUCoreFunctions* floatCore, const CoreInt8Functions* int8Core, int pack, int32_t* int8GemmUnit) {
+void XPUConvolutionTiledExecutor:: setIm2ColParameter(ConvolutionCommon::Im2ColParameter& dstIm2ColParamter, const Convolution2DCommon* convCommon, Tensor* input, Tensor* output, int padX, int padY, const XPUCoreFunctions* floatCore, const XPUCoreInt8Functions* int8Core, int pack, int32_t* int8GemmUnit) {
     // FIXME: Set int8 and float's pack as diff
     if (pack == 0) {
         pack = floatCore->pack;

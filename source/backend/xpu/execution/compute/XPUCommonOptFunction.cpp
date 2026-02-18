@@ -36,6 +36,84 @@ using Vec = MNN::Math::Vec<float, 4>;
 namespace MNN {
 namespace XPU {
 
+#ifdef MNN_LOW_MEMORY
+void MNNQuantScaleFP32(float* absmax, float* quant_scale, float* dequant_scale, size_t thread, size_t batch) {
+    for (int i = 0; i < batch; ++i) {
+        auto absmaxPtr = absmax + i;
+        float absVal = 0.f;
+        for (int t = 0; t < thread; ++t) {
+            absVal = std::max(absVal, absmaxPtr[t * batch]);
+        }
+        if (absVal < 1e-7) {
+            quant_scale[i] = 1.f;
+            dequant_scale[i] = 1.f;
+        } else {
+            quant_scale[i] = 127.0f / absVal;
+            dequant_scale[i] = absVal / 127.0f;
+        }
+    }
+}
+#endif
+
+#ifdef MNN_LOW_MEMORY
+static void MNNAbsMaxFP32(const float* source, float* absmax, size_t src_depth_quad, size_t realSize, int pack) {
+// #ifdef __aarch64__
+//     if (pack == 4) {
+//         MNNAbsMaxFP32_Pack4(source, absmax, src_depth_quad, realSize, pack);
+//         return;
+//     }
+//     if (pack == 8) {
+//         MNNAbsMaxFP32_Pack8(source, absmax, src_depth_quad, realSize, pack);
+//         return;
+//     }
+// #endif
+    // source: (ic/4, N, 4)
+    auto srcStep = pack * realSize;
+    for (int i = 0; i < realSize; ++i) {
+        float absmaxVal = 0.f; // absmaxVal>=0
+        for (int c = 0; c < src_depth_quad; ++c) {
+            auto src = source + c * srcStep + i * pack;
+            for (int k = 0; k < pack; ++k) {
+                absmaxVal = std::max(absmaxVal, std::abs(src[k]));
+            }
+        }
+        absmax[i] = absmaxVal;
+    }
+}
+
+void MNNDynamicQuantFP32(const float* src, int8_t* dst, const float* scale, size_t src_depth_quad, size_t realSize, int pack, const float* bias = nullptr) {
+// #ifdef __aarch64__
+//     if (pack == 4) {
+//         MNNDynamicQuantFP32_Pack4(src, dst, scale, src_depth_quad, realSize, nullptr, pack);
+//         return;
+//     }
+//     if (pack == 8) {
+//         MNNDynamicQuantFP32_Pack8(src, dst, scale, src_depth_quad, realSize, nullptr, pack);
+//         return;
+//     }
+// #endif
+#ifdef MNN_USE_SSE
+    uint8_t* dstPtr = reinterpret_cast<uint8_t*>(dst);
+    int offset = 128;
+#else
+    int8_t* dstPtr = dst;
+    int offset = 0;
+#endif
+    for (int i = 0; i < realSize; ++i) {
+        auto scaleVal = scale[i];
+        for (int c = 0; c < src_depth_quad; ++c) {
+            auto srcZ = src + c * pack * realSize + i * pack;
+            auto dstZ = dstPtr + c * pack * realSize + i * pack;
+            for (int k = 0; k < pack; ++k) {
+                int val = (int)roundf(srcZ[k] * scaleVal);
+                dstZ[k] = val + offset;
+            }
+        }
+    }
+}
+
+#endif // MNN_LOW_MEMORY
+
 template<typename T>
 void MNNPackC4Common(T* dst, const T* src, size_t area, size_t depth, int* areaOffset) {
     int depthC4     = depth / 4;
@@ -628,6 +706,38 @@ void MNNSiLuLowp(float* dst, const float* src, size_t dataSize) {
 #endif
 }
 
+
+#ifdef MNN_LOW_MEMORY
+static void generalIm2col(float* destOrigin, float const** sourceGroup, const int32_t* info, const int32_t* el, int LP, int pack) {
+    // LP >= pack
+    int number = info[0];
+    int eReal = info[1];
+    int eDest = info[2];
+    int offset = info[3];
+    for (int n=0; n<number; ++n) {
+        int e = el[4 * n + 0];
+        int l = el[4 * n + 1];
+        int eOffset = el[4 * n + 2];
+        int lOffset = el[4 * n + 3];
+        int lC = lOffset / LP;
+        int lR = lOffset % LP;
+        auto dest = destOrigin + eOffset * LP + lC * eDest * LP + lR;
+        auto source = sourceGroup[n];
+
+        for (int y=0; y<e; ++y) {
+            auto yR = y % eDest;
+            for (int x=0; x<l; ++x) {
+                auto xR = x % pack;
+                auto xC = x / pack;
+                auto xOut = x / LP;
+                auto xIn = x % LP;
+                dest[xOut * eDest * LP + yR * LP + xIn] = source[xC * eReal * pack + y * pack * offset + xR];
+            }
+        }
+    }
+}
+#endif // MNN_LOW_MEMORY
+
 static XPUCoreFunctions* gCoreFunction = nullptr;
 
 void MNNXPUCoreFunctionInit() {
@@ -755,13 +865,13 @@ void MNNXPUCoreFunctionInit() {
 //     gCoreFunction->MNNPackedMatMul_int8 = MNNPackedMatMul_int8;
 //     gCoreFunction->MNNPackedMatMulRemain_int8 = MNNPackedMatMulRemain_int8;
 // #endif
-// #ifdef MNN_LOW_MEMORY
-//     gCoreFunction->MNNAbsMax = MNNAbsMaxFP32;                      // abs max value for [icDiv4,plane,4] -> abs max:[plane]
-//     gCoreFunction->MNNDynamicQuant = MNNDynamicQuantFP32;          // symmetric 'batch' quant for [icDiv4,plane,4]
+#ifdef MNN_LOW_MEMORY
+    gCoreFunction->MNNAbsMax = MNNAbsMaxFP32;                      // abs max value for [icDiv4,plane,4] -> abs max:[plane]
+    gCoreFunction->MNNDynamicQuant = MNNDynamicQuantFP32;          // symmetric 'batch' quant for [icDiv4,plane,4]
 //     gCoreFunction->MNNAsyQuantFunc = MNNAsyQuantFunc;              // asymmetric 'batch' quant for [icDiv4,plane,4]
 //     gCoreFunction->MNNAsyQuantInfo = MNNAsyQuantInfo_FP32;              // asymmetric quant/dequant scale&bias for [icDiv4,plane,4] -> scale&bias:[blockNum,plane]
-//     gCoreFunction->MNNQuantScale = MNNQuantScaleFP32;              // symmetric quant/dequant scale&bias for [icDiv4,plane,4] -> scale&bias:[plane]
-//     gCoreFunction->MNNGeneralIm2Col = generalIm2col;               // Im2Col based on float data -> output:[eU,kernelsize,lU,ep,lp]
+    gCoreFunction->MNNQuantScale = MNNQuantScaleFP32;              // symmetric quant/dequant scale&bias for [icDiv4,plane,4] -> scale&bias:[plane]
+    gCoreFunction->MNNGeneralIm2Col = generalIm2col;               // Im2Col based on float data -> output:[eU,kernelsize,lU,ep,lp]
 //     gCoreFunction->MNNDynamicUpdateConvBiasScale = MNNDynamicUpdateConvBiasScale;
 // #ifdef __aarch64__
 //     if (gCoreFunction->supportSDot) {
@@ -771,7 +881,7 @@ void MNNXPUCoreFunctionInit() {
 //         gCoreFunction->MNNGeneralIm2Col = MNNGeneralIm2col_Fp32Arm86;
 //     }
 // #endif
-// #endif
+#endif
 //     MNNCoreInt8FunctionInit();
 //     MNNFunctionInit();
 }

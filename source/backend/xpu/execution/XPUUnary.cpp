@@ -488,57 +488,57 @@ ErrorCode XPUUnary::onExecute(const std::vector<Tensor *> &inputs, const std::ve
     if (halide_type_float == output->getType().code) {
         outBytes = static_cast<XPUBackend*>(backend())->functions()->bytes;
     }
-    if (mTableBuffer.data()) {
-#ifdef MNN_USE_SSE
-        uint8_t* srcO = inputPtr;
-        uint8_t* dstO = outputPtr;
-        int offset = 128;
-#else
-        int8_t* srcO = (int8_t*)inputPtr;
-        int8_t* dstO = (int8_t*)outputPtr;
-        int offset = 0;
-#endif
-        MNN_CONCURRENCY_BEGIN(tId, schedule.second) {
-            int start = schedule.first * (int)tId;
-            int realSize = schedule.first;
-            if (tId == schedule.second -1 ) {
-                realSize = size - start;
-            }
-            if (realSize > 0) {
-                auto inp = srcO + start;
-                auto out = dstO + start;
-                for (int i = 0; i < realSize; ++i) {
-                    int idx = inp[i] - offset + 127;
-                    out[i] = offset + mTableBuffer[idx];
-                }
-            }
-        }
-        MNN_CONCURRENCY_END();
-        return NO_ERROR;
-    }
-    if (mProcInt8) {
-        MNN_CONCURRENCY_BEGIN(tId, schedule.second) {
-            QuanPrePostParameters params;
-            params.inputScale = mInpScale.data();
-            params.outputScale = mOupScale.data();
-            params.inputZeroPoint= mInpZeroPoint.data();
-            params.outputZeroPoint = mOupZeroPoint.data();
-            params.maxValue = mMaxMinValue[1];
-            params.minValue = mMaxMinValue[0];
-            int start = schedule.first * (int)tId;
-            int realSize = schedule.first;
-            if (tId == schedule.second -1 ) {
-                realSize = size - start;
-            }
-            if (realSize > 0) {
-                auto inp = inputPtr + start;
-                auto out = outputPtr + start;
-                mProcInt8(out, inp, realSize, &params);
-            }
-        }
-        MNN_CONCURRENCY_END();
-        return NO_ERROR;
-    }
+//     if (mTableBuffer.data()) {
+// #ifdef MNN_USE_SSE
+//         uint8_t* srcO = inputPtr;
+//         uint8_t* dstO = outputPtr;
+//         int offset = 128;
+// #else
+//         int8_t* srcO = (int8_t*)inputPtr;
+//         int8_t* dstO = (int8_t*)outputPtr;
+//         int offset = 0;
+// #endif
+//         MNN_CONCURRENCY_BEGIN(tId, schedule.second) {
+//             int start = schedule.first * (int)tId;
+//             int realSize = schedule.first;
+//             if (tId == schedule.second -1 ) {
+//                 realSize = size - start;
+//             }
+//             if (realSize > 0) {
+//                 auto inp = srcO + start;
+//                 auto out = dstO + start;
+//                 for (int i = 0; i < realSize; ++i) {
+//                     int idx = inp[i] - offset + 127;
+//                     out[i] = offset + mTableBuffer[idx];
+//                 }
+//             }
+//         }
+//         MNN_CONCURRENCY_END();
+//         return NO_ERROR;
+//     }
+//     if (mProcInt8) {
+//         MNN_CONCURRENCY_BEGIN(tId, schedule.second) {
+//             QuanPrePostParameters params;
+//             params.inputScale = mInpScale.data();
+//             params.outputScale = mOupScale.data();
+//             params.inputZeroPoint= mInpZeroPoint.data();
+//             params.outputZeroPoint = mOupZeroPoint.data();
+//             params.maxValue = mMaxMinValue[1];
+//             params.minValue = mMaxMinValue[0];
+//             int start = schedule.first * (int)tId;
+//             int realSize = schedule.first;
+//             if (tId == schedule.second -1 ) {
+//                 realSize = size - start;
+//             }
+//             if (realSize > 0) {
+//                 auto inp = inputPtr + start;
+//                 auto out = outputPtr + start;
+//                 mProcInt8(out, inp, realSize, &params);
+//             }
+//         }
+//         MNN_CONCURRENCY_END();
+//         return NO_ERROR;
+//     }
     MNN_CONCURRENCY_BEGIN(tId, schedule.second) {
         int start = schedule.first * (int)tId;
         int realSize = schedule.first;
@@ -585,7 +585,7 @@ public:
     }
 };
 
-// REGISTER_XPU_OP_CUSTOMIZED_CREATOR(XPUUnaryCreator, OpType_UnaryOp);
+REGISTER_XPU_OP_CUSTOMIZED_CREATOR(XPUUnaryCreator, OpType_UnaryOp);
 
 } // namespace XPU
 } // namespace MNN

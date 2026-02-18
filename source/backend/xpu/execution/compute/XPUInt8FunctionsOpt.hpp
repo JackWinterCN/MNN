@@ -76,7 +76,7 @@ struct QuanPrePostParameters{
 // void MNNBinaryMinInt8(int8_t* outputRaw, const int8_t* inputRaw0, const int8_t* inputRaw1, ssize_t* inputScalesInt32, float* inputScalesFp32, const QuanPrePostParameters* params, size_t elementSize, size_t needBroadcast);
 // void MNNScaleAndAddBiasInt8(int8_t* dst, const int8_t* src, const int32_t* bias, const int32_t* alpha, int32_t mShiftBits, ssize_t minValue, ssize_t maxValue, int8_t* inputZeroPoint, int8_t* outputZeroPoint, ssize_t planeNumber, ssize_t biasNumber, ssize_t pack = 4);
 
-struct CoreInt8Functions {
+struct XPUCoreInt8Functions {
     // MatMul
     void(*Int8GemmKernel)(int8_t* dst, const int8_t* src, const int8_t* weight, size_t src_depth_quad, size_t dst_step, size_t dst_depth_quad, const QuanPostTreatParameters* post, size_t realCount);
     void(*Int8GemmKernelFast)(int8_t* dst, const int8_t* src, const int8_t* weight, size_t src_depth_quad, size_t dst_step, size_t dst_depth_quad, const QuanPostTreatParameters* post, size_t realCount);
@@ -115,8 +115,8 @@ struct CoreInt8Functions {
 #endif
 };
 
-// void MNNCoreInt8FunctionInit();
-// CoreInt8Functions* MNNGetInt8CoreFunctions();
+void MNNXPUCoreInt8FunctionInit();
+XPUCoreInt8Functions* MNNXPUGetInt8CoreFunctions();
 
 } // namespace XPU
 } // namespace MNN

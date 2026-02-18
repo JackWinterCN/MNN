@@ -8,6 +8,7 @@
 
 #include "backend/xpu/execution/compute/XPUConvolutionFloatFactory.hpp"
 #include "backend/xpu/execution/compute/XPUDenseConvolutionTiledExecutor.hpp"
+#include "backend/xpu/execution/compute/XPUConvInt8TiledExecutor.hpp"
 #include "core/Macro.h"
 #include "core/OpCommonUtils.hpp"
 #include "core/ConvolutionCommon.hpp"
@@ -35,25 +36,29 @@ static Execution* _createUnit(const Tensor* input, const Tensor* output, Backend
     bool fastWay = common->kernelY() == 1 && common->kernelX() == 1
         && output->width() == input->width() && output->height() == input->height()
         && common->strideX() == 1 && common->strideY() == 1;
-// #ifdef MNN_LOW_MEMORY
-    // if (lowMemory && nullptr != weightQuantInfo.get() && originWeightSize == 0) {
-    //     if (cpuBackend->memoryMode() == BackendConfig::Memory_Low) {
-    //         return new DenseConvInt8TiledExecutor(backend, op, weightQuantInfo, true);
-    //     } else {
-    //         return new DenseConvolutionTiledExecutor(common, backend, originWeight, originWeightSize, bias, biasSize, weightQuantInfo);
-    //     }
-    // }
-// #else
+#ifdef MNN_LOW_MEMORY
+    if (lowMemory && nullptr != weightQuantInfo.get() && originWeightSize == 0) {
+        if (cpuBackend->memoryMode() == BackendConfig::Memory_Low) {
+            MNN_PRINT("[xpu] %s : run as int8\n", op->name()->c_str());
+            return new DenseConvInt8TiledGeneralExecutor(backend, op, weightQuantInfo, true);
+            // return new XPUDenseConvInt8TiledExecutor(backend, op, weightQuantInfo, true);
+        } else {
+            MNN_PRINT("[xpu] Warning: need to set backend Memory_Low while define MNN_LOW_MEMORY\n")
+            // return new DenseConvolutionTiledExecutor(common, backend, originWeight, originWeightSize, bias, biasSize, weightQuantInfo);
+        }
+    }
+#else
     // if (cpuBackend->memoryMode() == BackendConfig::Memory_Low) {
     //     return new DenseConvolutionTiledExecutor(common, backend, originWeight, originWeightSize, bias, biasSize, weightQuantInfo);
     // }
-// #endif
+#endif
 // #ifndef MNN_REDUCE_SIZE
     // if (fastWay && cpuBackend->functions()->matmulBytes == 0) {
     //     return new Convolution1x1Strassen(common, backend, originWeight, originWeightSize, bias, biasSize);
     // }
 // #endif
     // if (cpuBackend->getRuntime()->hint().winogradMemoryUsed == 0 || (!ConvolutionWinogradBridge::canUseWinograd(common))) {
+        MNN_PRINT("[xpu] %s : run as float\n", op->name()->c_str());
         return new XPUDenseConvolutionGeneralExecutor(common, backend, originWeight, originWeightSize, bias, biasSize, nullptr);
     // }
     // XPUPerfConfig convPerfconfig = DenseConvolutionTiledExecutor::bestTileConvolutionConfig(common, input, output, cpuBackend->threadNumber(), backend);

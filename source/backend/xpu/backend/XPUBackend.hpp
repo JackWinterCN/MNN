@@ -11,6 +11,8 @@
 #include <MNN/MNNForwardType.h>
 #include "MNN_generated.h"
 #include "backend/xpu/execution/compute/XPUCommonOptFunction.hpp"
+#include "backend/xpu/execution/compute/XPUInt8FunctionsOpt.hpp"
+
 
 namespace MNN {
 
@@ -71,6 +73,10 @@ public:
   BackendConfig::MemoryMode memoryMode() const {
     return mMemory;
   }
+  virtual const Runtime* getRuntime() override;
+  size_t getTensorSize(const Tensor* tensor, bool multiBytes = false) const;
+  static size_t getBytes(const Backend* backend, const Tensor* output);
+
   void computeDivideSizes(int size, int *dst, float avgDiv = 0) const {
     // if (mGroupWithComputeRate.size() <= 1 ||
     //     (avgDiv > 0 && avgDiv < mComputeI)) {
@@ -99,6 +105,9 @@ public:
     // }
   }
   const XPU::XPUCoreFunctions *functions() const { return mCoreFunctions; }
+  const XPU::XPUCoreInt8Functions* int8Functions() const {
+    return mInt8CoreFunctions;
+  }
   static bool addOpCreator(OpType t, OpCreator *c);
 
 private:
@@ -118,7 +127,7 @@ private:
   BackendConfig::MemoryMode mMemory{BackendConfig::MemoryMode::Memory_Low};
   std::shared_ptr<XPU::XPUMemPool> mExecutionBufferPool;
   XPU::XPUCoreFunctions *mCoreFunctions;
-  // CoreInt8Functions *mInt8CoreFunctions;
+  XPU::XPUCoreInt8Functions *mInt8CoreFunctions;
   int mThreadNumber{1};
 };
 
