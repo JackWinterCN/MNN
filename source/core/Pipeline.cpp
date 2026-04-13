@@ -1207,7 +1207,7 @@ ErrorCode Pipeline::execute() {
     }
     auto& mBackend = mInfo.first.cache.first;
     auto& mBackupBackend = mInfo.first.cache.second;
-#define MNN_OP_TIME_DEBUG
+// #define MNN_OP_TIME_DEBUG
 #ifdef MNN_OP_TIME_DEBUG
     std::vector<std::pair<std::string, float>> time_cost;
     MNN::Timer _t;
