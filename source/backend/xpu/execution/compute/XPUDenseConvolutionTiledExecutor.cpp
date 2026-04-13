@@ -244,6 +244,9 @@ ErrorCode XPUDenseConvolutionTiledExecutor::onResize(const std::vector<Tensor *>
     return NO_ERROR;
 }
 
+std::vector<XPUDenseConvolutionGeneralExecutor::ConvParamStatistic>
+    XPUDenseConvolutionGeneralExecutor::conv_param_statistic_;
+
 XPUDenseConvolutionGeneralExecutor::XPUDenseConvolutionGeneralExecutor(const Convolution2DCommon* common, Backend* b,
                                                    const float* originWeight, size_t originWeightSize,
                                                    const float* bias, size_t biasSize, std::shared_ptr<ConvolutionCommon::Int8Common> int8Info)
@@ -330,6 +333,66 @@ XPUDenseConvolutionGeneralExecutor::XPUDenseConvolutionGeneralExecutor(std::shar
 XPUDenseConvolutionGeneralExecutor::~XPUDenseConvolutionGeneralExecutor() {
     // Do nothing
 }
+
+void XPUDenseConvolutionGeneralExecutor::runConvParamStatistic(Tensor *input) {
+    // statistic conv param
+    ConvParamStatistic conv_param_statistic;
+    conv_param_statistic.inputBatch = input->batch();
+    conv_param_statistic.inputCount = input->channel();
+    conv_param_statistic.inputH = input->height();
+    conv_param_statistic.inputW = input->width();
+    conv_param_statistic.padX = conv_common_param_.padX;
+    conv_param_statistic.padY = conv_common_param_.padY;
+    conv_param_statistic.outputCount = conv_common_param_.outputCount;
+    conv_param_statistic.kernelX = conv_common_param_.kernelX;
+    conv_param_statistic.kernelY = conv_common_param_.kernelY;
+    conv_param_statistic.strideX = conv_common_param_.strideX;
+    conv_param_statistic.strideY = conv_common_param_.strideY;
+    conv_param_statistic.dilateX = conv_common_param_.dilateX;
+    conv_param_statistic.dilateY = conv_common_param_.dilateY;
+    conv_param_statistic.group = conv_common_param_.group;
+    conv_param_statistic_.push_back(conv_param_statistic);
+
+    auto print_fun = [](const std::vector<ConvParamStatistic> &conv_param_statistic_) {
+        for (auto &param : conv_param_statistic_) {
+            MNN_PRINT(
+                "conv param: IN: %d, IC: %d, IH: %d, IW: %d, inputSize: %ld, input4LineSize: %ld, "
+                "PX: %d, PY: %d, OC: %d, KX: %d, KY: %d, weightBiasNum: %d, "
+                "SX: %d, SY: %d, DX: %d, DY: %d, GP: %d\n",
+                param.inputBatch, param.inputCount, param.inputH, param.inputW,
+                param.inputBatch * param.inputCount * param.inputH * param.inputW * sizeof(float),
+                param.inputCount * param.inputW * 4 * sizeof(float), param.padX, param.padY,
+                param.outputCount, param.kernelX, param.kernelY,
+                param.outputCount * param.inputCount * param.kernelX * param.kernelY + param.outputCount,
+                param.strideX, param.strideY, param.dilateX, param.dilateY,
+                param.group);
+        }
+    };
+    if (conv_param_statistic_.size() >= 60) {
+        MNN_PRINT("========conv param statistic sorting by inputSize=======\n");
+        std::sort(conv_param_statistic_.begin(), conv_param_statistic_.end(),
+                [](const ConvParamStatistic &a, const ConvParamStatistic &b) {
+                    return a.inputBatch * a.inputCount * a.inputH * a.inputW * sizeof(float) >
+                        b.inputBatch * b.inputCount * b.inputH * b.inputW * sizeof(float);
+                });
+        print_fun(conv_param_statistic_);
+        MNN_PRINT("=====conv param statistic sorting by input4LineSize=====\n");
+        std::sort(conv_param_statistic_.begin(), conv_param_statistic_.end(),
+                [](const ConvParamStatistic &a, const ConvParamStatistic &b) {
+                    return a.inputCount * a.inputW * 4 * sizeof(float) >
+                        b.inputCount * b.inputW * 4 * sizeof(float);
+                });
+        print_fun(conv_param_statistic_);
+        MNN_PRINT("=====conv param statistic sorting by weightBiasNum======\n");
+        std::sort(conv_param_statistic_.begin(), conv_param_statistic_.end(),
+                [](const ConvParamStatistic &a, const ConvParamStatistic &b) {
+                    return a.outputCount * a.inputCount * a.kernelX * a.kernelY + a.outputCount >
+                        b.outputCount * b.inputCount * b.kernelX * b.kernelY + b.outputCount;
+                });
+        print_fun(conv_param_statistic_);
+    }
+}
+
 bool XPUDenseConvolutionGeneralExecutor::onClone(Backend* bn, const Op* op, Execution** dst) {
     if (!mValid) {
         return false;
@@ -534,6 +597,7 @@ void MNNPackC4Common(T* dst, const T* src, size_t area, size_t depth, int* areaO
 ErrorCode XPUDenseConvolutionGeneralExecutor::onExecute(const std::vector<Tensor *> &inputs, const std::vector<Tensor *> &outputs) {
     ErrorCode code = NO_ERROR;
     // auto code = mProxy->onExecute(mInputs, outputs);
+    runConvParamStatistic(inputs[0]);
 
     Tensor input_nchw;
     TensorUtils::copyShape(inputs[0], &input_nchw, true, true);
@@ -543,7 +607,10 @@ ErrorCode XPUDenseConvolutionGeneralExecutor::onExecute(const std::vector<Tensor
     conv_input_.resize(input_nchw.elementSize());
     memcpy((void*)conv_input_.data(), (void*)input_nchw.deviceId(), input_nchw.size());
 
-    auto conv_output = conv2d(conv_input_, conv_weight_, conv_bias_, inputs[0]->batch(), inputs[0]->height(), inputs[0]->width(), conv_common_param_);
+    auto conv_output =
+        conv2d(conv_input_, conv_weight_, conv_bias_, inputs[0]->batch(),
+               inputs[0]->height(), inputs[0]->width(), conv_common_param_);
+
     if ((conv_common_param_.padX == 0 && conv_common_param_.padY == 0 &&
          conv_common_param_.strideX == 1 && conv_common_param_.strideY == 1 &&
          conv_common_param_.kernelX == 1 && conv_common_param_.kernelY == 1 &&
@@ -559,40 +626,64 @@ ErrorCode XPUDenseConvolutionGeneralExecutor::onExecute(const std::vector<Tensor
          conv_common_param_.kernelX == 3 && conv_common_param_.kernelY == 3 &&
          conv_common_param_.inputCount % N_PE == 0 &&
          conv_common_param_.outputCount % N_PE == 0)) {
-      struct XPUCoreConvParams conv_params;
-      conv_params.padX = conv_common_param_.padX;
-      conv_params.padY = conv_common_param_.padY;
-      conv_params.kernelX = conv_common_param_.kernelX;
-      conv_params.kernelY = conv_common_param_.kernelY;
-      conv_params.strideX = conv_common_param_.strideX;
-      conv_params.strideY = conv_common_param_.strideY;
-      conv_params.dilateX = conv_common_param_.dilateX;
-      conv_params.dilateY = conv_common_param_.dilateY;
-      conv_params.group = conv_common_param_.group;
-      conv_params.inputCount = conv_common_param_.inputCount;
-      conv_params.outputCount = conv_common_param_.outputCount;
-      conv_params.relu = conv_common_param_.relu;
-      conv_params.relu6 = conv_common_param_.relu6;
-      conv_params.pads = conv_common_param_.pads;
-      auto output_nchw = xpu_core_run(
-          conv_input_, conv_weight_, conv_bias_, inputs[0]->batch(),
-          inputs[0]->height(), inputs[0]->width(), conv_params, true, false);
-      if (conv_output.size() != output_nchw.size()) {
-        MNN_PRINT("inequal size: %ld, %ld\n", conv_output.size(),
-                  output_nchw.size());
-        exit(-1);
-      }
-      for (int i = 0; i < conv_output.size(); ++i) {
-        if (abs(conv_output[i] - output_nchw[i]) > 1e-3) {
-          MNN_PRINT("conv error at %d, %f, %f\n", i, conv_output[i],
-                    output_nchw[i]);
-          exit(-1);
+        MNN_PRINT(
+                "start conv2d IN: %d, IC: %d, IH: %d, IW: %d, inputSize: %ld, input4LineSize: %ld, "
+                "PX: %d, PY: %d, OC: %d, KX: %d, KY: %d, weightNum: %d, "
+                "SX: %d, SY: %d, DX: %d, DY: %d, GP: %d\n",
+                inputs[0]->batch(), conv_common_param_.inputCount, inputs[0]->height(), inputs[0]->width(),
+                inputs[0]->batch() * conv_common_param_.inputCount * inputs[0]->height() * inputs[0]->width() * sizeof(float),
+                conv_common_param_.inputCount * inputs[0]->width() * 4 * sizeof(float), 
+                conv_common_param_.padX, conv_common_param_.padY,
+                conv_common_param_.outputCount, conv_common_param_.kernelX, conv_common_param_.kernelY,
+                conv_common_param_.outputCount * conv_common_param_.inputCount * conv_common_param_.kernelX * conv_common_param_.kernelY,
+                conv_common_param_.strideX, conv_common_param_.strideY, conv_common_param_.dilateX, conv_common_param_.dilateY,
+                conv_common_param_.group);
+        int32_t input_cache_size = inputs[0]->width() * inputs[0]->channel() * 4 * sizeof(float);
+        int32_t weight_bias_num =
+            conv_common_param_.kernelX * conv_common_param_.kernelY *
+            conv_common_param_.inputCount * conv_common_param_.outputCount +
+            conv_common_param_.outputCount;
+
+        if (input_cache_size > MAX_IMAGE_CACHE_SIZE || weight_bias_num > MAX_WEIGHTS_BIAS_PER_LAYER) {
+            MNN_PRINT("xpu conv core: skip, input_cache_size: %d (%d), weight_bias_num: %d (%d)\n",
+                input_cache_size, MAX_IMAGE_CACHE_SIZE, weight_bias_num, MAX_WEIGHTS_BIAS_PER_LAYER);
+        } else {
+            MNN_PRINT("xpu conv core: run, input_cache_size: %d (%d), weight_bias_num: %d (%d)\n",
+                input_cache_size, MAX_IMAGE_CACHE_SIZE, weight_bias_num, MAX_WEIGHTS_BIAS_PER_LAYER);
+            struct XPUCoreConvParams conv_params;
+            conv_params.padX = conv_common_param_.padX;
+            conv_params.padY = conv_common_param_.padY;
+            conv_params.kernelX = conv_common_param_.kernelX;
+            conv_params.kernelY = conv_common_param_.kernelY;
+            conv_params.strideX = conv_common_param_.strideX;
+            conv_params.strideY = conv_common_param_.strideY;
+            conv_params.dilateX = conv_common_param_.dilateX;
+            conv_params.dilateY = conv_common_param_.dilateY;
+            conv_params.group = conv_common_param_.group;
+            conv_params.inputCount = conv_common_param_.inputCount;
+            conv_params.outputCount = conv_common_param_.outputCount;
+            conv_params.relu = conv_common_param_.relu;
+            conv_params.relu6 = conv_common_param_.relu6;
+            conv_params.pads = conv_common_param_.pads;
+            auto output_nchw = xpu_core_run(
+                conv_input_, conv_weight_, conv_bias_, inputs[0]->batch(),
+                inputs[0]->height(), inputs[0]->width(), conv_params, true, false);
+            if (conv_output.size() != output_nchw.size()) {
+                MNN_PRINT("inequal size: %ld, %ld\n", conv_output.size(),
+                            output_nchw.size());
+                exit(-1);
+            }
+            for (int i = 0; i < conv_output.size(); ++i) {
+                if (abs(conv_output[i] - output_nchw[i]) > 1e-3) {
+                    MNN_PRINT("conv error at %d, %f, %f\n", i, conv_output[i],
+                                output_nchw[i]);
+                    exit(-1);
+                }
+            }
+            MNN_PRINT("conv success for %dx%d, padX %d, padY %d, strideX %d, strideY %d\n",
+                conv_params.kernelX, conv_params.kernelY, conv_params.padX,
+                conv_params.padY, conv_params.strideX, conv_params.strideY);
         }
-      }
-      MNN_PRINT(
-          "conv success for %dx%d, padX %d, padY %d, strideX %d, strideY %d\n",
-          conv_params.kernelX, conv_params.kernelY, conv_params.padX,
-          conv_params.padY, conv_params.strideX, conv_params.strideY);
     }
     int batch = inputs[0]->batch();
     int channel = outputs[0]->channel();

@@ -84,6 +84,9 @@ public:
         std::shared_ptr<MNN::Tensor> weight;
         std::shared_ptr<MNN::Tensor> weightInt8;
     };
+private:
+  void runConvParamStatistic(Tensor *input);
+
 protected:
     DequantizeCache mWeightCache;
     std::shared_ptr<DenseConvolutionTiledImpl> mProxy;
@@ -91,6 +94,25 @@ protected:
     std::vector<float> conv_bias_;
     std::vector<float> conv_weight_;
     std::vector<float> conv_input_;
+
+private:
+    struct ConvParamStatistic {
+        int32_t inputBatch;
+        int32_t inputCount;
+        int32_t inputH;
+        int32_t inputW;
+        int32_t padX;
+        int32_t padY;
+        int32_t outputCount;
+        int32_t kernelX;
+        int32_t kernelY;
+        int32_t strideX;
+        int32_t strideY;
+        int32_t dilateX;
+        int32_t dilateY;
+        int32_t group;
+    };
+    static std::vector<ConvParamStatistic> conv_param_statistic_;
 };
 
 class ConvolutionTiledExecutorMultiInput : public Execution {
