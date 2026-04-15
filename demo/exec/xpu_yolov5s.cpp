@@ -6,7 +6,9 @@
 #include <MNN/AutoTime.hpp>
 #include <MNN/MNNDefine.h>
 #include <cv/cv.hpp>
+#ifdef MNN_PERFETTO_ENABLED
 #include <perfetto_singleton.hpp>
+#endif
 
 using namespace MNN;
 using namespace MNN::Express;

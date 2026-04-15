@@ -16,8 +16,10 @@
 #include "shape/SizeComputer.hpp"
 #include "core/OpCommonUtils.hpp"
 #include <MNN/MNNDefine.h>
-#include "perfetto_singleton.hpp"
 
+#ifdef MNN_PERFETTO_ENABLED
+#include <perfetto_singleton.hpp>
+#endif
 // TODO: Find better way for debug
 //#define MNN_OP_SEPERATE
 //#define MNN_PIPELINE_DEBUG

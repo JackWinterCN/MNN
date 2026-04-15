@@ -7,6 +7,11 @@ cmake ..  -DCMAKE_BUILD_TYPE=Debug -DMNN_OPENCL=true -DMNN_BUILD_CONVERTER=ON -D
 
 cmake .. -DCMAKE_BUILD_TYPE=Debug -DMNN_BUILD_CONVERTER=ON  -DMNN_BUILD_TOOL=ON -DMNN_BUILD_QUANTOOLS=ON -DMNN_BUILD_DEMO=ON  -DMNN_BUILD_OPENCV=ON -DMNN_LOW_MEMORY=ON -DMNN_XPU=true && make -j4
 
+// x86 perfetto
+cmake ..  -DCMAKE_BUILD_TYPE=Debug -DMNN_OPENCL=true -DMNN_BUILD_CONVERTER=ON -DMNN_BUILD_TORCH=ON -DMNN_BUILD_LLM=ON -DMNN_SUPPORT_TRANSFORMER_FUSE=ON  -DMNN_BUILD_TOOL=ON -DMNN_BUILD_QUANTOOLS=ON -DMNN_BUILD_DEMO=ON  -DMNN_BUILD_OPENCV=ON -DMNN_BUILD_DIFFUSION=ON -DMNN_LOW_MEMORY=ON -DMNN_PERFETTO=ON && make -j4
+
+git format-patch -1
+git diff commit_id^ commit_id --binary > a.patch
 git apply --ignore-space-change --ignore-whitespace
 
 ../../build/xpu_yolov5s.out yolov5s_v7_offline_quant_no_encode.mnn ./testcat.jpg 0 2 2

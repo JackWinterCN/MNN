@@ -16,6 +16,9 @@
 #ifdef LLM_SUPPORT_AUDIO
 #include "audio/audio.hpp"
 #endif
+#ifdef MNN_PERFETTO_ENABLED
+#include <perfetto_singleton.hpp>
+#endif
 using namespace MNN::Transformer;
 
 static void tuning_prepare(Llm* llm) {
@@ -240,6 +243,13 @@ int main(int argc, const char* argv[]) {
         std::cout << "Usage: " << argv[0] << " config.json <prompt.txt>" << std::endl;
         return 0;
     }
+#ifdef MNN_PERFETTO_ENABLED
+    // wait tracing start
+    PerfettoSigleton::GetInstance().WaitForTracingStart();
+#endif
+#ifdef MNN_PERFETTO_ENABLED
+    TRACE_EVENT_BEGIN("MNN", "Init & Model Load");
+#endif
     MNN::BackendConfig backendConfig;
     auto executor = MNN::Express::Executor::newExecutor(MNN_FORWARD_CPU, backendConfig, 1);
     MNN::Express::ExecutorScope s(executor);
@@ -252,12 +262,31 @@ int main(int argc, const char* argv[]) {
         AUTOTIME;
         llm->load();
     }
+#ifdef MNN_PERFETTO_ENABLED
+    TRACE_EVENT_END("MNN"); // "Init & Model Load"
+#endif
+
     if (true) {
+#ifdef MNN_PERFETTO_ENABLED
+        TRACE_EVENT_BEGIN("MNN", "tuning prepare");
+#endif
         AUTOTIME;
         tuning_prepare(llm.get());
+
+#ifdef MNN_PERFETTO_ENABLED
+        TRACE_EVENT_END("MNN"); // "tuning prepare"
+#endif
     }
     if (argc < 3) {
+#ifdef MNN_PERFETTO_ENABLED
+        TRACE_EVENT_BEGIN("MNN", "chat");
+#endif
+
         chat(llm.get());
+
+#ifdef MNN_PERFETTO_ENABLED
+        TRACE_EVENT_END("MNN"); // "chat"
+#endif
         return 0;
     }
     int max_token_number = -1;
@@ -276,5 +305,8 @@ int main(int argc, const char* argv[]) {
         })");
     }
     std::string prompt_file = argv[2];
+#ifdef MNN_PERFETTO_ENABLED
+    TRACE_EVENT("MNN", "eval");
+#endif
     return eval(llm.get(), prompt_file, max_token_number);
 }

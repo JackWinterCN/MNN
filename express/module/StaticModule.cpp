@@ -18,8 +18,9 @@
 #include "core/TensorUtils.hpp"
 #include "core/FileLoader.hpp"
 #include "core/OpCommonUtils.hpp"
-#include "perfetto_singleton.hpp"
-
+#ifdef MNN_PERFETTO_ENABLED
+#include <perfetto_singleton.hpp>
+#endif
 
 namespace MNN {
 namespace Express {
