@@ -16,6 +16,7 @@
 #include "shape/SizeComputer.hpp"
 #include "core/OpCommonUtils.hpp"
 #include <MNN/MNNDefine.h>
+#include "perfetto_singleton.hpp"
 
 // TODO: Find better way for debug
 //#define MNN_OP_SEPERATE
@@ -1244,8 +1245,16 @@ ErrorCode Pipeline::execute() {
                       EnumNameOpType(cmd.op->type()));
             _t.reset();
 #endif
+#ifdef MNN_PERFETTO_ENABLED
+            TRACE_EVENT_BEGIN(
+                "MNN", "op", "name",
+                perfetto::DynamicString{EnumNameOpType(cmd.op->type())});
+#endif
             auto code = cmd.execution->onExecute(cmd.workInputs, cmd.workOutputs);
 
+#ifdef MNN_PERFETTO_ENABLED
+            TRACE_EVENT_END("MNN");
+#endif
 #ifdef MNN_OP_TIME_DEBUG
             MNN_PRINT("%s(%s) <-- cost: %f ms\n",
                       EnumNameOpType(cmd.op->type()),

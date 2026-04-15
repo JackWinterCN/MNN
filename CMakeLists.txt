@@ -20,6 +20,7 @@ endif()
 project(MNN VERSION ${MNN_VERSION} LANGUAGES C CXX ASM)
 # complier options
 set(CMAKE_C_STANDARD 99)
+set(CMAKE_CXX_STANDARD 17)
 IF (NOT (CMAKE_CXX_STANDARD EQUAL 17))
   set(CMAKE_CXX_STANDARD 11)
 ENDIF()
@@ -244,6 +245,7 @@ option(MNN_TENSORRT "Enable TensorRT" OFF)
 option(MNN_COREML "Enable CoreML" OFF)
 option(MNN_NNAPI "Enable NNAPI" OFF)
 option(MNN_XPU "Enable XPU" OFF)
+option(MNN_PERFETTO "Enable Perfetto" OFF)
 
 option(MNN_GPU_TIME_PROFILE "Enable time profiling for the OpenCL backend and Vulkan backend." OFF)
 
@@ -301,6 +303,7 @@ message(STATUS "\tThreadPool: ${MNN_USE_THREAD_POOL}")
 message(STATUS "\tHidden: ${MNN_HIDDEN}")
 message(STATUS "\tBuild Path: ${CMAKE_CURRENT_BINARY_DIR}")
 message(STATUS "\tCUDA PROFILE: ${MNN_CUDA_PROFILE}")
+message(STATUS "\tPerfetto: ${MNN_PERFETTO}")
 
 if(CMAKE_SYSTEM_NAME MATCHES "^Android" OR CMAKE_SYSTEM_NAME MATCHES "^Linux")
     add_definitions(-fPIC)
@@ -431,6 +434,14 @@ list(APPEND MNN_INCLUDES
 include_directories(${MNN_INCLUDES})
 set(MNN_OBJECTS_TO_LINK "")
 set(MNN_TARGETS "")
+
+# Perfetto
+IF(MNN_PERFETTO)
+    add_definitions(-DMNN_PERFETTO_ENABLED)
+    include_directories(${CMAKE_CURRENT_LIST_DIR}/perfetto/)
+    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/perfetto/)
+    list(APPEND MNN_OBJECTS_TO_LINK $<TARGET_OBJECTS:MNN_PERFETTO>)
+ENDIF()
 
 # Core
 FILE(GLOB MNN_Core_SRC ${CMAKE_CURRENT_LIST_DIR}/source/core/*)
@@ -626,7 +637,7 @@ IF(MNN_QNN)
     list(APPEND MNN_OBJECTS_TO_LINK $<TARGET_OBJECTS:MNN_QNN>)
 ENDIF()
 
-# QNN
+# XPU
 IF(MNN_XPU)
     add_definitions(-DMNN_XPU_ENABLED=1)
     add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/source/backend/xpu/)

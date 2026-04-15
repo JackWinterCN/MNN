@@ -5,8 +5,8 @@
 #include <MNN/expr/Module.hpp>
 #include <MNN/AutoTime.hpp>
 #include <MNN/MNNDefine.h>
-
 #include <cv/cv.hpp>
+#include <perfetto_singleton.hpp>
 
 using namespace MNN;
 using namespace MNN::Express;
@@ -23,7 +23,7 @@ int main(int argc, const char *argv[]) {
   int precision = BackendConfig::Precision_High;
   int memory_mode = BackendConfig::Memory_Normal;
   int forwardType = MNN_FORWARD_CPU;
-  int warmup = 0;
+  int warmup = 10;
   const auto model_file = argv[1];
   const auto input_file = argv[2];
   if (argc >= 4) {
@@ -38,6 +38,14 @@ int main(int argc, const char *argv[]) {
   if (argc >= 7) {
     thread = atoi(argv[6]);
   }
+
+#ifdef MNN_PERFETTO_ENABLED
+  // wait tracing start
+  PerfettoSigleton::GetInstance().WaitForTracingStart();
+#endif
+#ifdef MNN_PERFETTO_ENABLED
+  TRACE_EVENT_BEGIN("MNN", "Init & Model Load");
+#endif
   MNN::ScheduleConfig sConfig;
   sConfig.type = static_cast<MNNForwardType>(forwardType);
   sConfig.numThread = thread;
@@ -57,6 +65,12 @@ int main(int argc, const char *argv[]) {
   std::shared_ptr<Module> net(Module::load(std::vector<std::string>{},
                                            std::vector<std::string>{},
                                            model_file, rtmgr));
+#ifdef MNN_PERFETTO_ENABLED
+  TRACE_EVENT_END("MNN");
+#endif
+#ifdef MNN_PERFETTO_ENABLED
+  TRACE_EVENT_BEGIN("MNN", "Preprocess");
+#endif
   auto original_image = imread(input_file);
   auto dims = original_image->getInfo()->dim;
   int ih = dims[0];
@@ -71,6 +85,12 @@ int main(int argc, const char *argv[]) {
                  {1. / 255., 1. / 255., 1. / 255.});
   auto input = _Unsqueeze(image, {0});
   input = _Convert(input, NC4HW4);
+#ifdef MNN_PERFETTO_ENABLED
+  TRACE_EVENT_END("MNN");
+#endif
+#ifdef MNN_PERFETTO_ENABLED
+  TRACE_EVENT_BEGIN("MNN", "Warmup");
+#endif
   for (int i = 0; i < warmup; i++) {
     MNN_PRINT("======> net forward warmup start\n");
     MNN::Timer _t;
@@ -78,12 +98,23 @@ int main(int argc, const char *argv[]) {
     auto time = (float)_t.durationInUs() / 1000.0f;
     MNN_PRINT("======> net forward time = %f ms\n", time);
   }
+#ifdef MNN_PERFETTO_ENABLED
+  TRACE_EVENT_END("MNN");
+#endif
+#ifdef MNN_PERFETTO_ENABLED
+  TRACE_EVENT_BEGIN("MNN", "Forward");
+#endif
   MNN_PRINT("======> net forward start\n");
   MNN::Timer _t;
   auto outputs = net->onForward({input});
   auto time = (float)_t.durationInUs() / 1000.0f;
   MNN_PRINT("======> net forward time = %f ms\n", time);
-
+#ifdef MNN_PERFETTO_ENABLED
+  TRACE_EVENT_END("MNN");
+#endif
+#ifdef MNN_PERFETTO_ENABLED
+  TRACE_EVENT_BEGIN("MNN", "Postprocess");
+#endif
   auto output = _Convert(outputs[0], NCHW);
   output = _Squeeze(output);
   // output shape: [25200, 85]; 85 means: [cx, cy, w, h, box_conf, prob * 80]
@@ -147,5 +178,8 @@ int main(int argc, const char *argv[]) {
     MNN_PRINT("result image write to `res.jpg`.\n");
   }
   rtmgr->updateCache();
+#ifdef MNN_PERFETTO_ENABLED
+  TRACE_EVENT_END("MNN");
+#endif
   return 0;
 }

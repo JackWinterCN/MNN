@@ -18,6 +18,8 @@
 #include "core/TensorUtils.hpp"
 #include "core/FileLoader.hpp"
 #include "core/OpCommonUtils.hpp"
+#include "perfetto_singleton.hpp"
+
 
 namespace MNN {
 namespace Express {
@@ -555,7 +557,9 @@ ErrorCode StaticModule::_execute() {
 }
 
 std::vector<Express::VARP> StaticModule::onForward(const std::vector<Express::VARP>& inputs) {
-
+#ifdef MNN_PERFETTO_ENABLED
+    TRACE_EVENT("MNN", "StaticModule::onForward");
+#endif
     AUTOTIME;
     std::vector<Express::VARP> outputs;
     bool runResize = (!mShapeInferSeperate) || inputs.size() > 0;

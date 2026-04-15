@@ -1,0 +1,154 @@
+buffers: {
+    size_kb: 89600
+    fill_policy: RING_BUFFER
+}
+buffers: {
+    size_kb: 12800
+    fill_policy: RING_BUFFER
+}
+
+# 3. 采集进程/线程状态（PID、线程名、CPU 亲和性等）
+data_sources: {
+    config {
+        name: "linux.process_stats"
+        target_buffer: 1
+        process_stats_config {
+            scan_all_processes_on_start: true
+            # the following item enables more detailed info about memory
+            proc_stats_poll_ms: 200
+        }
+    }
+    # producer_name_regex_filter: "*example*"
+}
+
+data_sources: {
+    config {
+        name: "linux.sys_stats"
+        sys_stats_config {
+            meminfo_period_ms: 1000
+            meminfo_counters: MEMINFO_MEM_TOTAL
+            meminfo_counters: MEMINFO_MEM_FREE
+            meminfo_counters: MEMINFO_MEM_AVAILABLE
+
+            vmstat_period_ms: 1000
+            vmstat_counters: VMSTAT_NR_FREE_PAGES
+            vmstat_counters: VMSTAT_NR_ALLOC_BATCH
+            vmstat_counters: VMSTAT_NR_INACTIVE_ANON
+            vmstat_counters: VMSTAT_NR_ACTIVE_ANON
+
+            stat_period_ms: 1000
+            stat_counters: STAT_CPU_TIMES
+            stat_counters: STAT_FORK_COUNT
+
+            cpufreq_period_ms: 500
+        }
+    }
+}
+
+data_sources {
+  config {
+    name: "android.heapprofd"
+    target_buffer: 0
+    heapprofd_config {
+      sampling_interval_bytes: 1
+      process_cmdline: "example"
+      continuous_dump_config {
+        dump_phase_ms: 10000
+        dump_interval_ms: 1000
+      }
+    }
+  }
+}
+
+# 2. 采集 CPU 热点（采样方式，低开销）
+data_sources {
+  config {
+    name: "linux.perf"
+    perf_event_config {
+      timebase {
+        counter: SW_CPU_CLOCK
+        frequency: 1000
+        timestamp_clock: PERF_CLOCK_MONOTONIC
+      }
+      callstack_sampling {
+        scope {
+          target_cmdline: "example"
+        }
+        kernel_frames: true
+      }
+    }
+  }
+}
+
+data_sources: {
+    config {
+        name: "linux.ftrace"
+        ftrace_config {
+            ftrace_events: "sched/sched_switch"  # 线程切换
+            ftrace_events: "power/suspend_resume"
+            ftrace_events: "power/cpu_frequency"
+            ftrace_events: "power/cpu_idle"
+            ftrace_events: "sched/sched_wakeup"
+            ftrace_events: "sched/sched_wakeup_new" # 新线程唤醒
+            ftrace_events: "sched/sched_waking"     # 线程唤醒中
+            ftrace_events: "sched/sched_process_exit"
+            ftrace_events: "sched/sched_process_free"
+            ftrace_events: "task/task_newtask"
+            ftrace_events: "task/task_rename"
+            ftrace_events: "mm/page_alloc"
+            ftrace_events: "mm/page_free"
+            ftrace_events: "mm_event/mm_event_record"
+            ftrace_events: "kmem/ion_heap_grow"
+            ftrace_events: "kmem/ion_heap_shrink"
+            ftrace_events: "syscalls/sys_enter_openat"
+            ftrace_events: "syscalls/sys_exit_openat"
+            ftrace_events: "syscalls/sys_enter_read"
+            ftrace_events: "syscalls/sys_exit_read"
+            # 进程级内存事件
+            ftrace_events: "kmem/page_alloc"    # 物理页分配
+            ftrace_events: "kmem/page_free"     # 物理页释放
+            ftrace_events: "kmem/rss_stat"      # 进程 RSS 变化（已保留）
+            ftrace_events: "mm/mmap"           # 内存映射（如 malloc 底层）
+            ftrace_events: "mm/mmunmap"         # 解除内存映射
+            ftrace_events: "mm/pagefault"       # 页错误（内存访问触发）
+            # 系统级内存事件
+            ftrace_events: "vmscan/kswapd_wake" # 内存回收触发
+            ftrace_events: "vmscan/shrink_inactive_list" # 页框回收
+            # 进程上下文关联（确保内存事件绑定到 PID）
+            ftrace_events: "sched/sched_process_exec" # 进程启动
+            ftrace_events: "sched/sched_process_fork" # 进程创建
+            ftrace_events: "sched/sched_switch"       # 进程切换（保留上下文）
+        }
+    }
+    # producer_name_regex_filter: "example"
+}
+
+# 4. 关键：用户态堆分析器（捕获 malloc/free 等小内存分配）
+data_sources: {
+    config {
+        name: "linux.heap_profiler"
+        target_buffer: 0
+        heapprofd_config {
+            sampling_interval_bytes: 1  # 1字节采样（不遗漏小内存，默认可能是4KB）
+            all_heaps: true  # 跟踪所有进程的堆
+            heaps: "libc.malloc"
+            heaps: "malloc"
+            heaps: "new"
+            # process_cmdline: "./example"
+        }
+    }
+}
+
+data_sources {
+    config {
+        name: "track_event"
+        # track_event_config {
+        #    enabled_categories: "rendering"
+        #    disabled_categories: "*"
+        # }
+    }
+}
+
+duration_ms: 600000
+write_into_file: true  # 输出到文件（v50 建议显式声明）
+flush_period_ms: 1000  # 每 500ms 写入一次文件（避免数据丢失）
