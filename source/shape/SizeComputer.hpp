@@ -17,6 +17,7 @@
 #include "core/Execution.hpp"
 #include "core/TensorUtils.hpp"
 #define FLOPS_M 1000000.0f
+#define MEMORY_MB (1024.0f * 1024.0f)
 
 namespace MNN {
 
@@ -55,6 +56,16 @@ public:
                                  const std::vector<Tensor*>& outputs) const;
 
     /**
+     * @brief calculate the theoretical memory access of this op with the info of inputs size.
+     * @param op        given op.
+     * @param inputs    given input tensors.
+     * @param outputs   given output tensors.
+     * @return the memory access in MB.
+     */
+    virtual float onComputeMemoryTheoreticalMB(const MNN::Op* op, const std::vector<Tensor*>& inputs,
+                                               const std::vector<Tensor*>& outputs) const;
+
+    /**
      * @brief calculate input and output tensors' shape for any registed op.
      * @param op        given registed op.
      * @param inputs    given input tensors.
@@ -65,6 +76,8 @@ public:
                                   const std::vector<Tensor*>& outputs);
     static float computeFlops(const MNN::Op* op, const std::vector<Tensor*>& inputs,
                               const std::vector<Tensor*>& outputs);
+    static float computeMemoryTheoreticalMB(const MNN::Op* op, const std::vector<Tensor*>& inputs,
+                                            const std::vector<Tensor*>& outputs);
 
     static bool computeBroadCastDims(const MNN::Op* op, const std::vector<Tensor*>& inputs,
                                      const std::vector<Tensor*>& outputs);

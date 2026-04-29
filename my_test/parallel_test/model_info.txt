@@ -1,0 +1,485 @@
+// 2. MOP = inputSize + kernelSize + biasSize + outputSize
+//        = (Ci * Wi * Hi + Co * Ci / group * K^2  + Co + Co * Wo * Ho) * typeSize
+mobilenetv2-10
+    memory use 20.606136 MB, flops is 301.174194 M, theoretical memory 68.484863 MB, backendType is 13
+resnet50-v2-7
+    Session Info: memory use 172.451569 MB, flops is 4107.464844 M, theoretical memory 337.457153 MB, backendType is 13
+// MOP = C_{out} * W * H * (K^{2} * C_{in} / group * 2 + 1)
+
+
+
+➜ ✗ python -m onnx_tool -i mobilenetv2-10.onnx --mode profile --dynamic_shapes input:f32:1x3x224x224
+
+Name                  Type                 Forward_MACs  FPercent        Memory  MPercent       Params  PPercent    InShape       OutShape
+--------------------  -----------------  --------------  ----------  ----------  ----------  ---------  ----------  ------------  ------------
+Clip_85               Clip                       94,080  0.03%          188,160  0.29%               0  0.00%       1x960x7x7     1x960x7x7
+Conv_20               Conv                    3,637,760  1.14%          118,912  0.18%           4,640  0.13%       1x144x28x28   1x32x28x28
+Gemm_104              Gemm                    1,281,000  0.40%        5,128,000  7.77%       1,281,000  36.73%      1x1280        1x1000
+Clip_47               Clip                      150,528  0.05%          301,056  0.46%               0  0.00%       1x384x14x14   1x384x14x14
+Conv_56               Conv                    4,892,160  1.53%          400,896  0.61%          24,960  0.72%       1x64x14x14    1x384x14x14
+Conv_10               Conv                   11,289,600  3.53%        1,820,736  2.76%           3,600  0.10%       1x24x56x56    1x144x56x56
+Conv_94               Conv                   15,068,480  4.71%        1,292,800  1.96%         307,520  8.82%       1x960x7x7     1x320x7x7
+Clip_11               Clip                      903,168  0.28%        1,806,336  2.74%               0  0.00%       1x144x56x56   1x144x56x56
+Clip_36               Clip                       75,264  0.02%          150,528  0.23%               0  0.00%       1x192x14x14   1x192x14x14
+GlobalAveragePool_97  GlobalAveragePool          67,840  0.02%            5,120  0.01%               0  0.00%       1x1280x7x7    1x1280x1x1
+Clip_34               Clip                      301,056  0.09%          602,112  0.91%               0  0.00%       1x192x28x28   1x192x28x28
+Conv_92               Conv                      470,400  0.15%          226,560  0.34%           9,600  0.28%       1x960x7x7     1x960x7x7
+Conv_40               Conv                      752,640  0.24%          316,416  0.48%           3,840  0.11%       1x384x14x14   1x384x14x14
+Conv_77               Conv                    4,523,680  1.41%          400,640  0.61%          92,320  2.65%       1x576x7x7     1x160x7x7
+Add_43                Add                        12,544  0.00%           50,176  0.08%               0  0.00%       1x64x14x14    1x64x14x14
+Clip_3                Clip                      802,816  0.25%        1,605,632  2.43%               0  0.00%       1x32x112x112  1x32x112x112
+Conv_44               Conv                    4,892,160  1.53%          400,896  0.61%          24,960  0.72%       1x64x14x14    1x384x14x14
+Conv_27               Conv                    4,967,424  1.55%          627,456  0.95%           6,336  0.18%       1x32x28x28    1x192x28x28
+Conv_86               Conv                      470,400  0.15%          226,560  0.34%           9,600  0.28%       1x960x7x7     1x960x7x7
+Add_49                Add                        12,544  0.00%           50,176  0.08%               0  0.00%       1x64x14x14    1x64x14x14
+Add_66                Add                        18,816  0.01%           75,264  0.11%               0  0.00%       1x96x14x14    1x96x14x14
+Conv_29               Conv                    1,505,280  0.47%          609,792  0.92%           1,920  0.06%       1x192x28x28   1x192x28x28
+Clip_87               Clip                       94,080  0.03%          188,160  0.29%               0  0.00%       1x960x7x7     1x960x7x7
+Add_89                Add                         7,840  0.00%           31,360  0.05%               0  0.00%       1x160x7x7     1x160x7x7
+Conv_50               Conv                    4,892,160  1.53%          400,896  0.61%          24,960  0.72%       1x64x14x14    1x384x14x14
+Conv_60               Conv                    7,244,160  2.26%          223,104  0.34%          36,960  1.06%       1x384x14x14   1x96x14x14
+Clip_1                Clip                      802,816  0.25%        1,605,632  2.43%               0  0.00%       1x32x112x112  1x32x112x112
+Clip_62               Clip                      225,792  0.07%          451,584  0.68%               0  0.00%       1x576x14x14   1x576x14x14
+Conv_4                Conv                    6,623,232  2.07%          804,928  1.22%             528  0.02%       1x32x112x112  1x16x112x112
+Clip_91               Clip                       94,080  0.03%          188,160  0.29%               0  0.00%       1x960x7x7     1x960x7x7
+Clip_79               Clip                       94,080  0.03%          188,160  0.29%               0  0.00%       1x960x7x7     1x960x7x7
+Conv_95               Conv                   20,133,120  6.29%        1,894,400  2.87%         410,880  11.78%      1x320x7x7     1x1280x7x7
+Clip_41               Clip                      150,528  0.05%          301,056  0.46%               0  0.00%       1x384x14x14   1x384x14x14
+Conv_73               Conv                   10,950,912  3.42%          675,072  1.02%          55,872  1.60%       1x96x14x14    1x576x14x14
+Clip_53               Clip                      150,528  0.05%          301,056  0.46%               0  0.00%       1x384x14x14   1x384x14x14
+Clip_96               Clip                      125,440  0.04%          250,880  0.38%               0  0.00%       1x1280x7x7    1x1280x7x7
+Conv_0                Conv                   11,239,424  3.51%        1,609,216  2.44%             896  0.03%       1x3x224x224   1x32x112x112
+Conv_52               Conv                      752,640  0.24%          316,416  0.48%           3,840  0.11%       1x384x14x14   1x384x14x14
+Conv_88               Conv                    7,534,240  2.35%          646,400  0.98%         153,760  4.41%       1x960x7x7     1x160x7x7
+Conv_37               Conv                    2,420,992  0.76%           99,584  0.15%          12,352  0.35%       1x192x14x14   1x64x14x14
+Conv_14               Conv                   10,913,280  3.41%          314,976  0.48%           3,480  0.10%       1x144x56x56   1x24x56x56
+Clip_6                Clip                    2,408,448  0.75%        4,816,896  7.30%               0  0.00%       1x96x112x112  1x96x112x112
+Conv_12               Conv                    4,515,840  1.41%        1,812,096  2.75%           1,440  0.04%       1x144x56x56   1x144x56x56
+Conv_35               Conv                      376,320  0.12%          158,208  0.24%           1,920  0.06%       1x192x28x28   1x192x14x14
+Clip_81               Clip                       94,080  0.03%          188,160  0.29%               0  0.00%       1x960x7x7     1x960x7x7
+Add_83                Add                         7,840  0.00%           31,360  0.05%               0  0.00%       1x160x7x7     1x160x7x7
+Conv_31               Conv                    4,841,984  1.51%          125,056  0.19%           6,176  0.18%       1x192x28x28   1x32x28x28
+Clip_70               Clip                      225,792  0.07%          451,584  0.68%               0  0.00%       1x576x14x14   1x576x14x14
+Conv_23               Conv                    1,505,280  0.47%          609,792  0.92%           1,920  0.06%       1x192x28x28   1x192x28x28
+Clip_28               Clip                      301,056  0.09%          602,112  0.91%               0  0.00%       1x192x28x28   1x192x28x28
+Conv_63               Conv                    1,128,960  0.35%          474,624  0.72%           5,760  0.17%       1x576x14x14   1x576x14x14
+Conv_5                Conv                   20,471,808  6.40%        4,823,424  7.31%           1,632  0.05%       1x16x112x112  1x96x112x112
+Conv_25               Conv                    4,841,984  1.51%          125,056  0.19%           6,176  0.18%       1x192x28x28   1x32x28x28
+Conv_78               Conv                    7,573,440  2.37%          806,400  1.22%         154,560  4.43%       1x160x7x7     1x960x7x7
+Conv_42               Conv                    4,829,440  1.51%          148,736  0.23%          24,640  0.71%       1x384x14x14   1x64x14x14
+Conv_61               Conv                   10,950,912  3.42%          675,072  1.02%          55,872  1.60%       1x96x14x14    1x576x14x14
+Clip_24               Clip                      301,056  0.09%          602,112  0.91%               0  0.00%       1x192x28x28   1x192x28x28
+Clip_74               Clip                      225,792  0.07%          451,584  0.68%               0  0.00%       1x576x14x14   1x576x14x14
+Conv_46               Conv                      752,640  0.24%          316,416  0.48%           3,840  0.11%       1x384x14x14   1x384x14x14
+Clip_59               Clip                      150,528  0.05%          301,056  0.46%               0  0.00%       1x384x14x14   1x384x14x14
+Conv_71               Conv                   10,856,832  3.39%          296,832  0.45%          55,392  1.59%       1x576x14x14   1x96x14x14
+Clip_30               Clip                      301,056  0.09%          602,112  0.91%               0  0.00%       1x192x28x28   1x192x28x28
+Conv_58               Conv                      752,640  0.24%          316,416  0.48%           3,840  0.11%       1x384x14x14   1x384x14x14
+Conv_18               Conv                    1,128,960  0.35%          457,344  0.69%           1,440  0.04%       1x144x56x56   1x144x28x28
+Add_72                Add                        18,816  0.01%           75,264  0.11%               0  0.00%       1x96x14x14    1x96x14x14
+Conv_90               Conv                    7,573,440  2.37%          806,400  1.22%         154,560  4.43%       1x160x7x7     1x960x7x7
+Conv_33               Conv                    4,967,424  1.55%          627,456  0.95%           6,336  0.18%       1x32x28x28    1x192x28x28
+Conv_69               Conv                    1,128,960  0.35%          474,624  0.72%           5,760  0.17%       1x576x14x14   1x576x14x14
+Conv_16               Conv                   11,289,600  3.53%        1,820,736  2.76%           3,600  0.10%       1x24x56x56    1x144x56x56
+Add_15                Add                        75,264  0.02%          301,056  0.46%               0  0.00%       1x24x56x56    1x24x56x56
+Clip_13               Clip                      903,168  0.28%        1,806,336  2.74%               0  0.00%       1x144x56x56   1x144x56x56
+Conv_7                Conv                    3,010,560  0.94%        1,208,064  1.83%             960  0.03%       1x96x112x112  1x96x56x56
+Conv_48               Conv                    4,829,440  1.51%          148,736  0.23%          24,640  0.71%       1x384x14x14   1x64x14x14
+Clip_17               Clip                      903,168  0.28%        1,806,336  2.74%               0  0.00%       1x144x56x56   1x144x56x56
+Conv_54               Conv                    4,829,440  1.51%          148,736  0.23%          24,640  0.71%       1x384x14x14   1x64x14x14
+Conv_65               Conv                   10,856,832  3.39%          296,832  0.45%          55,392  1.59%       1x576x14x14   1x96x14x14
+Conv_84               Conv                    7,573,440  2.37%          806,400  1.22%         154,560  4.43%       1x160x7x7     1x960x7x7
+Clip_19               Clip                      225,792  0.07%          451,584  0.68%               0  0.00%       1x144x28x28   1x144x28x28
+Conv_9                Conv                    7,300,608  2.28%          310,368  0.47%           2,328  0.07%       1x96x56x56    1x24x56x56
+Conv_2                Conv                    4,014,080  1.25%        1,606,912  2.44%             320  0.01%       1x32x112x112  1x32x112x112
+Add_26                Add                        25,088  0.01%          100,352  0.15%               0  0.00%       1x32x28x28    1x32x28x28
+Clip_68               Clip                      225,792  0.07%          451,584  0.68%               0  0.00%       1x576x14x14   1x576x14x14
+Clip_39               Clip                      150,528  0.05%          301,056  0.46%               0  0.00%       1x384x14x14   1x384x14x14
+Conv_21               Conv                    4,967,424  1.55%          627,456  0.95%           6,336  0.18%       1x32x28x28    1x192x28x28
+Clip_45               Clip                      150,528  0.05%          301,056  0.46%               0  0.00%       1x384x14x14   1x384x14x14
+Conv_80               Conv                      470,400  0.15%          226,560  0.34%           9,600  0.28%       1x960x7x7     1x960x7x7
+Clip_57               Clip                      150,528  0.05%          301,056  0.46%               0  0.00%       1x384x14x14   1x384x14x14
+Clip_93               Clip                       94,080  0.03%          188,160  0.29%               0  0.00%       1x960x7x7     1x960x7x7
+Clip_22               Clip                      301,056  0.09%          602,112  0.91%               0  0.00%       1x192x28x28   1x192x28x28
+Clip_76               Clip                       56,448  0.02%          112,896  0.17%               0  0.00%       1x576x7x7     1x576x7x7
+Conv_82               Conv                    7,534,240  2.35%          646,400  0.98%         153,760  4.41%       1x960x7x7     1x160x7x7
+Add_55                Add                        12,544  0.00%           50,176  0.08%               0  0.00%       1x64x14x14    1x64x14x14
+Conv_38               Conv                    4,892,160  1.53%          400,896  0.61%          24,960  0.72%       1x64x14x14    1x384x14x14
+Clip_51               Clip                      150,528  0.05%          301,056  0.46%               0  0.00%       1x384x14x14   1x384x14x14
+Add_32                Add                        25,088  0.01%          100,352  0.15%               0  0.00%       1x32x28x28    1x32x28x28
+Clip_8                Clip                      602,112  0.19%        1,204,224  1.83%               0  0.00%       1x96x56x56    1x96x56x56
+Conv_67               Conv                   10,950,912  3.42%          675,072  1.02%          55,872  1.60%       1x96x14x14    1x576x14x14
+Clip_64               Clip                      225,792  0.07%          451,584  0.68%               0  0.00%       1x576x14x14   1x576x14x14
+Conv_75               Conv                      282,240  0.09%          135,936  0.21%           5,760  0.17%       1x576x14x14   1x576x7x7
+Total                 _                     319,949,192  100%        65,961,536  100%        3,487,816  100%        _             _
+
+
+
+
+➜ ✗ python -m onnx_tool -i resnet50-v2-7.onnx --mode profile --dynamic_shapes data:f32:1x3x224x224
+
+Name                              Type                  Forward_MACs  FPercent         Memory  MPercent        Params  PPercent    InShape       OutShape
+--------------------------------  ------------------  --------------  ----------  -----------  ----------  ----------  ----------  ------------  ------------
+resnetv24_stage1_batchnorm8_fwd   BatchNormalization       6,221,824  0.14%           803,840  0.32%              256  0.00%       1x64x56x56    1x64x56x56
+resnetv24_stage3_conv18_fwd       Conv                    51,380,224  1.16%         1,851,392  0.74%          262,144  1.02%       1x256x14x14   1x1024x14x14
+resnetv24_stage3_batchnorm11_fwd  BatchNormalization       1,555,456  0.04%           204,800  0.08%            1,024  0.00%       1x256x14x14   1x256x14x14
+resnetv24_stage3_activation12     Relu                       200,704  0.00%           802,816  0.32%                0  0.00%       1x1024x14x14  1x1024x14x14
+resnetv24_stage3_activation3      Relu                       200,704  0.00%           802,816  0.32%                0  0.00%       1x1024x14x14  1x1024x14x14
+resnetv24_stage3_conv4_fwd        Conv                    51,380,224  1.16%         1,249,280  0.50%          262,144  1.02%       1x1024x14x14  1x256x14x14
+resnetv24_stage2__plus1           Add                        401,408  0.01%         1,605,632  0.65%                0  0.00%       1x512x28x28   1x512x28x28
+resnetv24_stage3__plus1           Add                        200,704  0.00%           802,816  0.32%                0  0.00%       1x1024x14x14  1x1024x14x14
+resnetv24_stage3_activation9      Relu                       200,704  0.00%           802,816  0.32%                0  0.00%       1x1024x14x14  1x1024x14x14
+resnetv24_stage1_conv0_fwd        Conv                    12,845,056  0.29%           819,200  0.33%            4,096  0.02%       1x64x56x56    1x64x56x56
+resnetv24_stage3_activation2      Relu                        50,176  0.00%           200,704  0.08%                0  0.00%       1x256x14x14   1x256x14x14
+resnetv24_stage3_conv11_fwd       Conv                   115,605,504  2.62%         2,560,000  1.03%          589,824  2.30%       1x256x14x14   1x256x14x14
+resnetv24_stage3_batchnorm10_fwd  BatchNormalization       1,555,456  0.04%           204,800  0.08%            1,024  0.00%       1x256x14x14   1x256x14x14
+resnetv24_stage3_batchnorm3_fwd   BatchNormalization       6,221,824  0.14%           819,200  0.33%            4,096  0.02%       1x1024x14x14  1x1024x14x14
+resnetv24_stage4_batchnorm1_fwd   BatchNormalization       3,110,912  0.07%           409,600  0.16%            2,048  0.01%       1x512x14x14   1x512x14x14
+resnetv24_pool0_fwd               MaxPool                  1,806,336  0.04%           802,816  0.32%                0  0.00%       1x64x112x112  1x64x56x56
+resnetv24_stage4_conv6_fwd        Conv                    51,380,224  1.16%         4,595,712  1.85%        1,048,576  4.10%       1x512x7x7     1x2048x7x7
+resnetv24_stage1_batchnorm3_fwd   BatchNormalization      24,887,296  0.56%         3,215,360  1.29%            1,024  0.00%       1x256x56x56   1x256x56x56
+resnetv24_stage3_activation5      Relu                        50,176  0.00%           200,704  0.08%                0  0.00%       1x256x14x14   1x256x14x14
+resnetv24_stage2_conv0_fwd        Conv                   102,760,448  2.33%         1,736,704  0.70%           32,768  0.13%       1x256x56x56   1x128x56x56
+resnetv24_stage1_activation1      Relu                       200,704  0.00%           802,816  0.32%                0  0.00%       1x64x56x56    1x64x56x56
+resnetv24_stage2_activation10     Relu                       100,352  0.00%           401,408  0.16%                0  0.00%       1x128x28x28   1x128x28x28
+resnetv24_stage4_conv0_fwd        Conv                   102,760,448  2.33%         2,498,560  1.00%          524,288  2.05%       1x1024x14x14  1x512x14x14
+resnetv24_stage2_activation1      Relu                       401,408  0.01%         1,605,632  0.65%                0  0.00%       1x128x56x56   1x128x56x56
+resnetv24_stage3_batchnorm2_fwd   BatchNormalization       1,555,456  0.04%           204,800  0.08%            1,024  0.00%       1x256x14x14   1x256x14x14
+resnetv24_stage3_batchnorm9_fwd   BatchNormalization       6,221,824  0.14%           819,200  0.33%            4,096  0.02%       1x1024x14x14  1x1024x14x14
+resnetv24_stage3__plus3           Add                        200,704  0.00%           802,816  0.32%                0  0.00%       1x1024x14x14  1x1024x14x14
+resnetv24_stage1_batchnorm1_fwd   BatchNormalization       6,221,824  0.14%           803,840  0.32%              256  0.00%       1x64x56x56    1x64x56x56
+resnetv24_stage3_conv6_fwd        Conv                    51,380,224  1.16%         1,851,392  0.74%          262,144  1.02%       1x256x14x14   1x1024x14x14
+resnetv24_stage1_conv2_fwd        Conv                    51,380,224  1.16%         3,276,800  1.32%           16,384  0.06%       1x64x56x56    1x256x56x56
+resnetv24_stage2_conv6_fwd        Conv                    51,380,224  1.16%         1,867,776  0.75%           65,536  0.26%       1x128x28x28   1x512x28x28
+resnetv24_stage3_conv13_fwd       Conv                    51,380,224  1.16%         1,249,280  0.50%          262,144  1.02%       1x1024x14x14  1x256x14x14
+resnetv24_stage3__plus0           Add                        200,704  0.00%           802,816  0.32%                0  0.00%       1x1024x14x14  1x1024x14x14
+resnetv24_stage4_batchnorm0_fwd   BatchNormalization       6,221,824  0.14%           819,200  0.33%            4,096  0.02%       1x1024x14x14  1x1024x14x14
+resnetv24_stage3_activation0      Relu                       401,408  0.01%         1,605,632  0.65%                0  0.00%       1x512x28x28   1x512x28x28
+resnetv24_stage2_activation3      Relu                       401,408  0.01%         1,605,632  0.65%                0  0.00%       1x512x28x28   1x512x28x28
+resnetv24_stage1_conv4_fwd        Conv                    51,380,224  1.16%           868,352  0.35%           16,384  0.06%       1x256x56x56   1x64x56x56
+resnetv24_stage4_activation4      Relu                        25,088  0.00%           100,352  0.04%                0  0.00%       1x512x7x7     1x512x7x7
+resnetv24_stage2_batchnorm1_fwd   BatchNormalization      12,443,648  0.28%         1,607,680  0.65%              512  0.00%       1x128x56x56   1x128x56x56
+resnetv24_stage2_activation9      Relu                       401,408  0.01%         1,605,632  0.65%                0  0.00%       1x512x28x28   1x512x28x28
+resnetv24_stage3__plus2           Add                        200,704  0.00%           802,816  0.32%                0  0.00%       1x1024x14x14  1x1024x14x14
+resnetv24_stage2_activation6      Relu                       401,408  0.01%         1,605,632  0.65%                0  0.00%       1x512x28x28   1x512x28x28
+resnetv24_relu1_fwd               Relu                       100,352  0.00%           401,408  0.16%                0  0.00%       1x2048x7x7    1x2048x7x7
+resnetv24_stage3_batchnorm17_fwd  BatchNormalization       1,555,456  0.04%           204,800  0.08%            1,024  0.00%       1x256x14x14   1x256x14x14
+resnetv24_stage4_conv7_fwd        Conv                    51,380,224  1.16%         4,294,656  1.73%        1,048,576  4.10%       1x2048x7x7    1x512x7x7
+resnetv24_stage4__plus2           Add                        100,352  0.00%           401,408  0.16%                0  0.00%       1x2048x7x7    1x2048x7x7
+resnetv24_conv0_fwd               Conv                   118,013,952  2.67%         3,248,896  1.31%            9,408  0.04%       1x3x224x224   1x64x112x112
+resnetv24_stage3_batchnorm8_fwd   BatchNormalization       1,555,456  0.04%           204,800  0.08%            1,024  0.00%       1x256x14x14   1x256x14x14
+resnetv24_stage2_conv1_fwd        Conv                   115,605,504  2.62%           991,232  0.40%          147,456  0.58%       1x128x56x56   1x128x28x28
+resnetv24_stage3_conv10_fwd       Conv                    51,380,224  1.16%         1,249,280  0.50%          262,144  1.02%       1x1024x14x14  1x256x14x14
+resnetv24_stage1_activation6      Relu                       802,816  0.02%         3,211,264  1.29%                0  0.00%       1x256x56x56   1x256x56x56
+resnetv24_stage1_activation8      Relu                       200,704  0.00%           802,816  0.32%                0  0.00%       1x64x56x56    1x64x56x56
+resnetv24_stage3_conv7_fwd        Conv                    51,380,224  1.16%         1,249,280  0.50%          262,144  1.02%       1x1024x14x14  1x256x14x14
+resnetv24_stage1_conv8_fwd        Conv                   115,605,504  2.62%           950,272  0.38%           36,864  0.14%       1x64x56x56    1x64x56x56
+resnetv24_stage4_activation2      Relu                        25,088  0.00%           100,352  0.04%                0  0.00%       1x512x7x7     1x512x7x7
+resnetv24_stage2_batchnorm0_fwd   BatchNormalization      24,887,296  0.56%         3,215,360  1.29%            1,024  0.00%       1x256x56x56   1x256x56x56
+resnetv24_stage3_batchnorm5_fwd   BatchNormalization       1,555,456  0.04%           204,800  0.08%            1,024  0.00%       1x256x14x14   1x256x14x14
+resnetv24_stage4_conv3_fwd        Conv                   102,760,448  2.33%         8,790,016  3.53%        2,097,152  8.19%       1x1024x14x14  1x2048x7x7
+resnetv24_stage4_batchnorm3_fwd   BatchNormalization       3,110,912  0.07%           434,176  0.17%            8,192  0.03%       1x2048x7x7    1x2048x7x7
+resnetv24_stage3_batchnorm1_fwd   BatchNormalization       6,221,824  0.14%           806,912  0.32%            1,024  0.00%       1x256x28x28   1x256x28x28
+resnetv24_stage3_conv12_fwd       Conv                    51,380,224  1.16%         1,851,392  0.74%          262,144  1.02%       1x256x14x14   1x1024x14x14
+resnetv24_stage4_activation8      Relu                        25,088  0.00%           100,352  0.04%                0  0.00%       1x512x7x7     1x512x7x7
+resnetv24_stage2_conv11_fwd       Conv                   115,605,504  2.62%           991,232  0.40%          147,456  0.58%       1x128x28x28   1x128x28x28
+resnetv24_stage2_activation11     Relu                       100,352  0.00%           401,408  0.16%                0  0.00%       1x128x28x28   1x128x28x28
+resnetv24_stage2_activation2      Relu                       100,352  0.00%           401,408  0.16%                0  0.00%       1x128x28x28   1x128x28x28
+resnetv24_stage2_conv4_fwd        Conv                    51,380,224  1.16%           663,552  0.27%           65,536  0.26%       1x512x28x28   1x128x28x28
+resnetv24_stage1_conv3_fwd        Conv                    51,380,224  1.16%         3,276,800  1.32%           16,384  0.06%       1x64x56x56    1x256x56x56
+resnetv24_stage1_conv5_fwd        Conv                   115,605,504  2.62%           950,272  0.38%           36,864  0.14%       1x64x56x56    1x64x56x56
+resnetv24_stage3_conv14_fwd       Conv                   115,605,504  2.62%         2,560,000  1.03%          589,824  2.30%       1x256x14x14   1x256x14x14
+resnetv24_stage4_batchnorm2_fwd   BatchNormalization         777,728  0.02%           108,544  0.04%            2,048  0.01%       1x512x7x7     1x512x7x7
+resnetv24_stage4_activation0      Relu                       200,704  0.00%           802,816  0.32%                0  0.00%       1x1024x14x14  1x1024x14x14
+resnetv24_stage1__plus1           Add                        802,816  0.02%         3,211,264  1.29%                0  0.00%       1x256x56x56   1x256x56x56
+resnetv24_stage1_conv9_fwd        Conv                    51,380,224  1.16%         3,276,800  1.32%           16,384  0.06%       1x64x56x56    1x256x56x56
+resnetv24_stage1_batchnorm4_fwd   BatchNormalization       6,221,824  0.14%           803,840  0.32%              256  0.00%       1x64x56x56    1x64x56x56
+resnetv24_stage2_conv9_fwd        Conv                    51,380,224  1.16%         1,867,776  0.75%           65,536  0.26%       1x128x28x28   1x512x28x28
+resnetv24_stage2_conv2_fwd        Conv                    51,380,224  1.16%         1,867,776  0.75%           65,536  0.26%       1x128x28x28   1x512x28x28
+resnetv24_stage2_conv7_fwd        Conv                    51,380,224  1.16%           663,552  0.27%           65,536  0.26%       1x512x28x28   1x128x28x28
+resnetv24_stage3_activation15     Relu                       200,704  0.00%           802,816  0.32%                0  0.00%       1x1024x14x14  1x1024x14x14
+resnetv24_stage2__plus0           Add                        401,408  0.01%         1,605,632  0.65%                0  0.00%       1x512x28x28   1x512x28x28
+resnetv24_stage3_activation7      Relu                        50,176  0.00%           200,704  0.08%                0  0.00%       1x256x14x14   1x256x14x14
+resnetv24_stage3__plus4           Add                        200,704  0.00%           802,816  0.32%                0  0.00%       1x1024x14x14  1x1024x14x14
+resnetv24_stage2_activation5      Relu                       100,352  0.00%           401,408  0.16%                0  0.00%       1x128x28x28   1x128x28x28
+resnetv24_stage3_batchnorm13_fwd  BatchNormalization       1,555,456  0.04%           204,800  0.08%            1,024  0.00%       1x256x14x14   1x256x14x14
+resnetv24_stage4_conv1_fwd        Conv                   115,605,504  2.62%         9,537,536  3.83%        2,359,296  9.22%       1x512x14x14   1x512x7x7
+resnetv24_stage3_activation6      Relu                       200,704  0.00%           802,816  0.32%                0  0.00%       1x1024x14x14  1x1024x14x14
+resnetv24_stage4_conv8_fwd        Conv                   115,605,504  2.62%         9,537,536  3.83%        2,359,296  9.22%       1x512x7x7     1x512x7x7
+resnetv24_stage3_conv3_fwd        Conv                   102,760,448  2.33%         2,899,968  1.17%          524,288  2.05%       1x512x28x28   1x1024x14x14
+resnetv24_stage2_batchnorm11_fwd  BatchNormalization       3,110,912  0.07%           403,456  0.16%              512  0.00%       1x128x28x28   1x128x28x28
+resnetv24_stage4__plus1           Add                        100,352  0.00%           401,408  0.16%                0  0.00%       1x2048x7x7    1x2048x7x7
+resnetv24_stage1_batchnorm7_fwd   BatchNormalization       6,221,824  0.14%           803,840  0.32%              256  0.00%       1x64x56x56    1x64x56x56
+resnetv24_stage4_conv2_fwd        Conv                    51,380,224  1.16%         4,595,712  1.85%        1,048,576  4.10%       1x512x7x7     1x2048x7x7
+resnetv24_stage2__plus3           Add                        401,408  0.01%         1,605,632  0.65%                0  0.00%       1x512x28x28   1x512x28x28
+resnetv24_stage4_conv5_fwd        Conv                   115,605,504  2.62%         9,537,536  3.83%        2,359,296  9.22%       1x512x7x7     1x512x7x7
+resnetv24_stage4_batchnorm7_fwd   BatchNormalization         777,728  0.02%           108,544  0.04%            2,048  0.01%       1x512x7x7     1x512x7x7
+resnetv24_stage4_conv9_fwd        Conv                    51,380,224  1.16%         4,595,712  1.85%        1,048,576  4.10%       1x512x7x7     1x2048x7x7
+resnetv24_stage4_batchnorm5_fwd   BatchNormalization         777,728  0.02%           108,544  0.04%            2,048  0.01%       1x512x7x7     1x512x7x7
+resnetv24_pool1_fwd               GlobalAveragePool          108,544  0.00%             8,192  0.00%                0  0.00%       1x2048x7x7    1x2048x1x1
+resnetv24_stage2_batchnorm2_fwd   BatchNormalization       3,110,912  0.07%           403,456  0.16%              512  0.00%       1x128x28x28   1x128x28x28
+resnetv24_stage3_conv15_fwd       Conv                    51,380,224  1.16%         1,851,392  0.74%          262,144  1.02%       1x256x14x14   1x1024x14x14
+resnetv24_stage4__plus0           Add                        100,352  0.00%           401,408  0.16%                0  0.00%       1x2048x7x7    1x2048x7x7
+resnetv24_stage4_activation6      Relu                       100,352  0.00%           401,408  0.16%                0  0.00%       1x2048x7x7    1x2048x7x7
+resnetv24_stage3_batchnorm0_fwd   BatchNormalization      12,443,648  0.28%         1,613,824  0.65%            2,048  0.01%       1x512x28x28   1x512x28x28
+resnetv24_stage1_conv6_fwd        Conv                    51,380,224  1.16%         3,276,800  1.32%           16,384  0.06%       1x64x56x56    1x256x56x56
+resnetv24_stage2_conv8_fwd        Conv                   115,605,504  2.62%           991,232  0.40%          147,456  0.58%       1x128x28x28   1x128x28x28
+resnetv24_stage3_activation1      Relu                       200,704  0.00%           802,816  0.32%                0  0.00%       1x256x28x28   1x256x28x28
+resnetv24_stage4_conv4_fwd        Conv                    51,380,224  1.16%         4,294,656  1.73%        1,048,576  4.10%       1x2048x7x7    1x512x7x7
+resnetv24_batchnorm2_fwd          BatchNormalization       3,110,912  0.07%           434,176  0.17%            8,192  0.03%       1x2048x7x7    1x2048x7x7
+resnetv24_batchnorm1_fwd          BatchNormalization      24,887,296  0.56%         3,212,288  1.29%              256  0.00%       1x64x112x112  1x64x112x112
+resnetv24_stage3_batchnorm6_fwd   BatchNormalization       6,221,824  0.14%           819,200  0.33%            4,096  0.02%       1x1024x14x14  1x1024x14x14
+resnetv24_stage1_batchnorm6_fwd   BatchNormalization      24,887,296  0.56%         3,215,360  1.29%            1,024  0.00%       1x256x56x56   1x256x56x56
+resnetv24_stage3_conv9_fwd        Conv                    51,380,224  1.16%         1,851,392  0.74%          262,144  1.02%       1x256x14x14   1x1024x14x14
+resnetv24_stage4_activation7      Relu                        25,088  0.00%           100,352  0.04%                0  0.00%       1x512x7x7     1x512x7x7
+resnetv24_stage1_activation7      Relu                       200,704  0.00%           802,816  0.32%                0  0.00%       1x64x56x56    1x64x56x56
+resnetv24_stage3_activation11     Relu                        50,176  0.00%           200,704  0.08%                0  0.00%       1x256x14x14   1x256x14x14
+resnetv24_stage4_batchnorm6_fwd   BatchNormalization       3,110,912  0.07%           434,176  0.17%            8,192  0.03%       1x2048x7x7    1x2048x7x7
+resnetv24_stage3_conv1_fwd        Conv                   115,605,504  2.62%         2,560,000  1.03%          589,824  2.30%       1x256x28x28   1x256x14x14
+resnetv24_stage2__plus2           Add                        401,408  0.01%         1,605,632  0.65%                0  0.00%       1x512x28x28   1x512x28x28
+resnetv24_stage2_conv12_fwd       Conv                    51,380,224  1.16%         1,867,776  0.75%           65,536  0.26%       1x128x28x28   1x512x28x28
+resnetv24_stage1_conv7_fwd        Conv                    51,380,224  1.16%           868,352  0.35%           16,384  0.06%       1x256x56x56   1x64x56x56
+resnetv24_stage3_conv5_fwd        Conv                   115,605,504  2.62%         2,560,000  1.03%          589,824  2.30%       1x256x14x14   1x256x14x14
+resnetv24_stage1_activation0      Relu                       200,704  0.00%           802,816  0.32%                0  0.00%       1x64x56x56    1x64x56x56
+resnetv24_stage3_batchnorm15_fwd  BatchNormalization       6,221,824  0.14%           819,200  0.33%            4,096  0.02%       1x1024x14x14  1x1024x14x14
+resnetv24_batchnorm0_fwd          BatchNormalization       4,666,368  0.11%           602,160  0.24%               12  0.00%       1x3x224x224   1x3x224x224
+resnetv24_stage2_activation8      Relu                       100,352  0.00%           401,408  0.16%                0  0.00%       1x128x28x28   1x128x28x28
+resnetv24_stage1_activation4      Relu                       200,704  0.00%           802,816  0.32%                0  0.00%       1x64x56x56    1x64x56x56
+resnetv24_stage2_batchnorm7_fwd   BatchNormalization       3,110,912  0.07%           403,456  0.16%              512  0.00%       1x128x28x28   1x128x28x28
+resnetv24_stage1_conv1_fwd        Conv                   115,605,504  2.62%           950,272  0.38%           36,864  0.14%       1x64x56x56    1x64x56x56
+resnetv24_stage3_conv2_fwd        Conv                    51,380,224  1.16%         1,851,392  0.74%          262,144  1.02%       1x256x14x14   1x1024x14x14
+resnetv24_stage3_batchnorm16_fwd  BatchNormalization       1,555,456  0.04%           204,800  0.08%            1,024  0.00%       1x256x14x14   1x256x14x14
+resnetv24_stage3_batchnorm4_fwd   BatchNormalization       1,555,456  0.04%           204,800  0.08%            1,024  0.00%       1x256x14x14   1x256x14x14
+resnetv24_stage1_activation5      Relu                       200,704  0.00%           802,816  0.32%                0  0.00%       1x64x56x56    1x64x56x56
+resnetv24_stage2_conv10_fwd       Conv                    51,380,224  1.16%           663,552  0.27%           65,536  0.26%       1x512x28x28   1x128x28x28
+resnetv24_stage3__plus5           Add                        200,704  0.00%           802,816  0.32%                0  0.00%       1x1024x14x14  1x1024x14x14
+resnetv24_stage3_conv0_fwd        Conv                   102,760,448  2.33%         1,327,104  0.53%          131,072  0.51%       1x512x28x28   1x256x28x28
+resnetv24_relu0_fwd               Relu                       802,816  0.02%         3,211,264  1.29%                0  0.00%       1x64x112x112  1x64x112x112
+resnetv24_stage2_batchnorm9_fwd   BatchNormalization      12,443,648  0.28%         1,613,824  0.65%            2,048  0.01%       1x512x28x28   1x512x28x28
+resnetv24_stage1_activation2      Relu                       200,704  0.00%           802,816  0.32%                0  0.00%       1x64x56x56    1x64x56x56
+resnetv24_stage2_batchnorm10_fwd  BatchNormalization       3,110,912  0.07%           403,456  0.16%              512  0.00%       1x128x28x28   1x128x28x28
+resnetv24_stage3_activation17     Relu                        50,176  0.00%           200,704  0.08%                0  0.00%       1x256x14x14   1x256x14x14
+resnetv24_stage3_activation4      Relu                        50,176  0.00%           200,704  0.08%                0  0.00%       1x256x14x14   1x256x14x14
+resnetv24_stage2_batchnorm4_fwd   BatchNormalization       3,110,912  0.07%           403,456  0.16%              512  0.00%       1x128x28x28   1x128x28x28
+resnetv24_stage1__plus0           Add                        802,816  0.02%         3,211,264  1.29%                0  0.00%       1x256x56x56   1x256x56x56
+resnetv24_stage3_conv17_fwd       Conv                   115,605,504  2.62%         2,560,000  1.03%          589,824  2.30%       1x256x14x14   1x256x14x14
+resnetv24_stage4_batchnorm8_fwd   BatchNormalization         777,728  0.02%           108,544  0.04%            2,048  0.01%       1x512x7x7     1x512x7x7
+resnetv24_stage3_conv8_fwd        Conv                   115,605,504  2.62%         2,560,000  1.03%          589,824  2.30%       1x256x14x14   1x256x14x14
+resnetv24_stage3_activation8      Relu                        50,176  0.00%           200,704  0.08%                0  0.00%       1x256x14x14   1x256x14x14
+resnetv24_stage4_activation5      Relu                        25,088  0.00%           100,352  0.04%                0  0.00%       1x512x7x7     1x512x7x7
+resnetv24_stage3_batchnorm7_fwd   BatchNormalization       1,555,456  0.04%           204,800  0.08%            1,024  0.00%       1x256x14x14   1x256x14x14
+resnetv24_stage2_batchnorm5_fwd   BatchNormalization       3,110,912  0.07%           403,456  0.16%              512  0.00%       1x128x28x28   1x128x28x28
+resnetv24_stage3_batchnorm12_fwd  BatchNormalization       6,221,824  0.14%           819,200  0.33%            4,096  0.02%       1x1024x14x14  1x1024x14x14
+resnetv24_stage3_activation13     Relu                        50,176  0.00%           200,704  0.08%                0  0.00%       1x256x14x14   1x256x14x14
+resnetv24_stage4_batchnorm4_fwd   BatchNormalization         777,728  0.02%           108,544  0.04%            2,048  0.01%       1x512x7x7     1x512x7x7
+resnetv24_stage1_batchnorm5_fwd   BatchNormalization       6,221,824  0.14%           803,840  0.32%              256  0.00%       1x64x56x56    1x64x56x56
+resnetv24_stage2_batchnorm6_fwd   BatchNormalization      12,443,648  0.28%         1,613,824  0.65%            2,048  0.01%       1x512x28x28   1x512x28x28
+resnetv24_stage2_conv3_fwd        Conv                   102,760,448  2.33%         2,129,920  0.86%          131,072  0.51%       1x256x56x56   1x512x28x28
+resnetv24_stage3_activation16     Relu                        50,176  0.00%           200,704  0.08%                0  0.00%       1x256x14x14   1x256x14x14
+resnetv24_stage1__plus2           Add                        802,816  0.02%         3,211,264  1.29%                0  0.00%       1x256x56x56   1x256x56x56
+resnetv24_stage3_activation14     Relu                        50,176  0.00%           200,704  0.08%                0  0.00%       1x256x14x14   1x256x14x14
+resnetv24_stage4_activation3      Relu                       100,352  0.00%           401,408  0.16%                0  0.00%       1x2048x7x7    1x2048x7x7
+resnetv24_stage3_conv16_fwd       Conv                    51,380,224  1.16%         1,249,280  0.50%          262,144  1.02%       1x1024x14x14  1x256x14x14
+resnetv24_stage2_conv5_fwd        Conv                   115,605,504  2.62%           991,232  0.40%          147,456  0.58%       1x128x28x28   1x128x28x28
+resnetv24_stage1_batchnorm2_fwd   BatchNormalization       6,221,824  0.14%           803,840  0.32%              256  0.00%       1x64x56x56    1x64x56x56
+resnetv24_stage2_batchnorm3_fwd   BatchNormalization      12,443,648  0.28%         1,613,824  0.65%            2,048  0.01%       1x512x28x28   1x512x28x28
+resnetv24_stage2_activation0      Relu                       802,816  0.02%         3,211,264  1.29%                0  0.00%       1x256x56x56   1x256x56x56
+resnetv24_stage3_batchnorm14_fwd  BatchNormalization       1,555,456  0.04%           204,800  0.08%            1,024  0.00%       1x256x14x14   1x256x14x14
+resnetv24_stage1_batchnorm0_fwd   BatchNormalization       6,221,824  0.14%           803,840  0.32%              256  0.00%       1x64x56x56    1x64x56x56
+resnetv24_dense0_fwd              Gemm                     2,049,000  0.05%         8,200,000  3.30%        2,049,000  8.01%       1x2048        1x1000
+resnetv24_stage4_activation1      Relu                       100,352  0.00%           401,408  0.16%                0  0.00%       1x512x14x14   1x512x14x14
+resnetv24_stage2_activation4      Relu                       100,352  0.00%           401,408  0.16%                0  0.00%       1x128x28x28   1x128x28x28
+resnetv24_stage2_activation7      Relu                       100,352  0.00%           401,408  0.16%                0  0.00%       1x128x28x28   1x128x28x28
+resnetv24_stage3_activation10     Relu                        50,176  0.00%           200,704  0.08%                0  0.00%       1x256x14x14   1x256x14x14
+resnetv24_stage2_batchnorm8_fwd   BatchNormalization       3,110,912  0.07%           403,456  0.16%              512  0.00%       1x128x28x28   1x128x28x28
+resnetv24_stage1_activation3      Relu                       802,816  0.02%         3,211,264  1.29%                0  0.00%       1x256x56x56   1x256x56x56
+Total                             _                    4,415,186,920  100%        248,806,000  100%        25,595,060  100%        _   
+
+
+➜ ✗ ../../build/MNNV2Basic.out mobilenetv2-10.mnn 10 0 0 4 0 1x3x224x224
+[MNNV2Basic.cpp:518]                                             OpName               Optype   RunCount   AverageTime(ms)/Percent     Flops(MFlops)/Percent        Memory(MB)/Percent
+[MNNV2Basic.cpp:523]                  output__matmul_converted_raster_0               Raster         10        0.003600 /  0.036%        0.001221 /  0.000%        0.009766 /  0.014%
+[MNNV2Basic.cpp:523]                                    output_raster_0               Raster         10        0.003800 /  0.038%        0.000954 /  0.000%        0.007629 /  0.011%
+[MNNV2Basic.cpp:523]                                                443             BinaryOp         10        0.025200 /  0.250%        0.007477 /  0.002%        0.089722 /  0.131%
+[MNNV2Basic.cpp:523]                                                452             BinaryOp         10        0.025500 /  0.253%        0.007477 /  0.002%        0.089722 /  0.131%
+[MNNV2Basic.cpp:523]                                                382             BinaryOp         10        0.039600 /  0.394%        0.011963 /  0.004%        0.143555 /  0.210%
+[MNNV2Basic.cpp:523]                                                400             BinaryOp         10        0.039700 /  0.395%        0.011963 /  0.004%        0.143555 /  0.210%
+[MNNV2Basic.cpp:523]                                                391             BinaryOp         10        0.039800 /  0.396%        0.011963 /  0.004%        0.143555 /  0.210%
+[MNNV2Basic.cpp:523]                                                426             BinaryOp         10        0.060000 /  0.596%        0.017944 /  0.006%        0.215332 /  0.314%
+[MNNV2Basic.cpp:523]                                                417             BinaryOp         10        0.060600 /  0.602%        0.017944 /  0.006%        0.215332 /  0.314%
+[MNNV2Basic.cpp:523]                                                594 ConvolutionDepthwise         10        0.064300 /  0.639%        0.254016 /  0.084%        0.560303 /  0.818%
+[MNNV2Basic.cpp:523]                                                519          Convolution         10        0.064400 /  0.640%        4.816896 /  1.599%        0.694092 /  1.013%
+[MNNV2Basic.cpp:523]                                                528          Convolution         10        0.066600 /  0.662%        4.816896 /  1.599%        0.694092 /  1.013%
+[MNNV2Basic.cpp:523]                                                534          Convolution         10        0.067400 /  0.670%        2.408448 /  0.800%        0.238525 /  0.348%
+[MNNV2Basic.cpp:523]                                                546          Convolution         10        0.067600 /  0.672%        4.816896 /  1.599%        0.430176 /  0.628%
+[MNNV2Basic.cpp:523]                                                537          Convolution         10        0.067900 /  0.675%        4.816896 /  1.599%        0.430176 /  0.628%
+[MNNV2Basic.cpp:523]                                                564          Convolution         10        0.068000 /  0.676%        4.816896 /  1.599%        0.430176 /  0.628%
+[MNNV2Basic.cpp:523]                                                510          Convolution         10        0.068900 /  0.685%        4.816896 /  1.599%        0.694092 /  1.013%
+[MNNV2Basic.cpp:523]                                                555          Convolution         10        0.069800 /  0.694%        4.816896 /  1.599%        0.430176 /  0.628%
+[MNNV2Basic.cpp:523]                                       464_raster_0              Pooling         10        0.070600 /  0.702%        0.000000 /  0.000%        0.244141 /  0.356%
+[MNNV2Basic.cpp:523]                                                507          Convolution         10        0.071100 /  0.707%        3.612672 /  1.200%        0.544067 /  0.794%
+[MNNV2Basic.cpp:523]                                                531 ConvolutionDepthwise         10        0.075200 /  0.747%        0.338688 /  0.112%        0.725098 /  1.059%
+[MNNV2Basic.cpp:523]                                                365             BinaryOp         10        0.078400 /  0.779%        0.023926 /  0.008%        0.287109 /  0.419%
+[MNNV2Basic.cpp:523]                                                356             BinaryOp         10        0.078800 /  0.783%        0.023926 /  0.008%        0.287109 /  0.419%
+[MNNV2Basic.cpp:523]                                                597          Convolution         10        0.085300 /  0.848%        4.515840 /  1.499%        0.489746 /  0.715%
+[MNNV2Basic.cpp:523]                                                516          Convolution         10        0.090800 /  0.903%        4.816896 /  1.599%        0.693481 /  1.013%
+[MNNV2Basic.cpp:523]                                                603 ConvolutionDepthwise         10        0.093200 /  0.926%        0.423360 /  0.141%        0.395508 /  0.578%
+[MNNV2Basic.cpp:523]                                                525          Convolution         10        0.094700 /  0.941%        4.816896 /  1.599%        0.693481 /  1.013%
+[MNNV2Basic.cpp:523]                                                618          Convolution         10        0.096000 /  0.954%        7.526400 /  2.499%        0.798950 /  1.167%
+[MNNV2Basic.cpp:523]                                                600          Convolution         10        0.096500 /  0.959%        7.526400 /  2.499%        0.798950 /  1.167%
+[MNNV2Basic.cpp:523]                                                609          Convolution         10        0.099400 /  0.988%        7.526400 /  2.499%        0.798950 /  1.167%
+[MNNV2Basic.cpp:523]                                                612 ConvolutionDepthwise         10        0.100100 /  0.995%        0.423360 /  0.141%        0.395508 /  0.578%
+[MNNV2Basic.cpp:523]                                                621 ConvolutionDepthwise         10        0.101300 /  1.007%        0.423360 /  0.141%        0.395508 /  0.578%
+[MNNV2Basic.cpp:523]                                                540 ConvolutionDepthwise         10        0.124300 /  1.236%        0.677376 /  0.225%        0.588867 /  0.860%
+[MNNV2Basic.cpp:523]                                                552          Convolution         10        0.128800 /  1.280%        4.816896 /  1.599%        0.428955 /  0.626%
+[MNNV2Basic.cpp:523]                                                558 ConvolutionDepthwise         10        0.132000 /  1.312%        0.677376 /  0.225%        0.588867 /  0.860%
+[MNNV2Basic.cpp:523]                                                543          Convolution         10        0.132700 /  1.319%        4.816896 /  1.599%        0.428955 /  0.626%
+[MNNV2Basic.cpp:523]                                                561          Convolution         10        0.134600 /  1.338%        4.816896 /  1.599%        0.428955 /  0.626%
+[MNNV2Basic.cpp:523]                                                549 ConvolutionDepthwise         10        0.136800 /  1.360%        0.677376 /  0.225%        0.588867 /  0.860%
+[MNNV2Basic.cpp:523]                                                567 ConvolutionDepthwise         10        0.137300 /  1.365%        0.677376 /  0.225%        0.588867 /  0.860%
+[MNNV2Basic.cpp:523]                                       474_raster_0               Raster         10        0.138600 /  1.378%        0.191406 /  0.064%        1.148438 /  1.677%
+[MNNV2Basic.cpp:523]                                                573          Convolution         10        0.139500 /  1.387%       10.838016 /  3.599%        0.715576 /  1.045%
+[MNNV2Basic.cpp:523]                                                606          Convolution         10        0.140600 /  1.398%        7.526400 /  2.499%        0.795898 /  1.162%
+[MNNV2Basic.cpp:523]                                                582          Convolution         10        0.141900 /  1.410%       10.838016 /  3.599%        0.715576 /  1.045%
+[MNNV2Basic.cpp:523]                                                501          Convolution         10        0.143000 /  1.421%       10.838016 /  3.599%        2.023499 /  2.955%
+[MNNV2Basic.cpp:523]                                                492          Convolution         10        0.145200 /  1.443%       10.838016 /  3.599%        2.023499 /  2.955%
+[MNNV2Basic.cpp:523]                                                591          Convolution         10        0.145200 /  1.443%       10.838016 /  3.599%        0.715576 /  1.045%
+[MNNV2Basic.cpp:523]                                                615          Convolution         10        0.146100 /  1.452%        7.526400 /  2.499%        0.795898 /  1.162%
+[MNNV2Basic.cpp:523]                                                489          Convolution         10        0.147200 /  1.463%        7.225344 /  2.399%        1.444427 /  2.109%
+[MNNV2Basic.cpp:523]                                                570          Convolution         10        0.161900 /  1.609%        7.225344 /  2.399%        0.499878 /  0.730%
+[MNNV2Basic.cpp:523]                                                480          Convolution         10        0.176600 /  1.755%        6.422528 /  2.132%        2.298889 /  3.357%
+[MNNV2Basic.cpp:523]                                                576 ConvolutionDepthwise         10        0.193700 /  1.925%        1.016064 /  0.337%        0.883301 /  1.290%
+[MNNV2Basic.cpp:523]                                                585 ConvolutionDepthwise         10        0.195400 /  1.942%        1.016064 /  0.337%        0.883301 /  1.290%
+[MNNV2Basic.cpp:523]                                                498          Convolution         10        0.214700 /  2.134%       10.838016 /  3.599%        2.023041 /  2.954%
+[MNNV2Basic.cpp:523]                                                504 ConvolutionDepthwise         10        0.215600 /  2.143%        1.016064 /  0.337%        2.158813 /  3.152%
+[MNNV2Basic.cpp:523]                                                624          Convolution         10        0.221800 /  2.205%       15.052800 /  4.998%        1.412354 /  2.062%
+[MNNV2Basic.cpp:523]                                                579          Convolution         10        0.231700 /  2.303%       10.838016 /  3.599%        0.713745 /  1.042%
+[MNNV2Basic.cpp:523]                                                522 ConvolutionDepthwise         10        0.233800 /  2.324%        1.354752 /  0.450%        1.155762 /  1.688%
+[MNNV2Basic.cpp:523]                                                339             BinaryOp         10        0.235600 /  2.342%        0.071777 /  0.024%        0.861328 /  1.258%
+[MNNV2Basic.cpp:523]                                                513 ConvolutionDepthwise         10        0.240500 /  2.391%        1.354752 /  0.450%        1.155762 /  1.688%
+[MNNV2Basic.cpp:523]                                                627          Convolution         10        0.242600 /  2.411%       20.070400 /  6.664%        1.866455 /  2.725%
+[MNNV2Basic.cpp:523]                                                588          Convolution         10        0.248900 /  2.474%       10.838016 /  3.599%        0.713745 /  1.042%
+[MNNV2Basic.cpp:523]                           output__matmul_converted          Convolution         10        0.251900 /  2.504%        1.280000 /  0.425%        4.895325 /  7.148%
+[MNNV2Basic.cpp:523]                                                483          Convolution         10        0.272500 /  2.709%       19.267584 /  6.397%        5.365601 /  7.835%
+[MNNV2Basic.cpp:523]                                                474          Convolution         10        0.353100 /  3.510%       10.838016 /  3.599%        2.108887 /  3.079%
+[MNNV2Basic.cpp:523]                                                486 ConvolutionDepthwise         10        0.550100 /  5.468%        2.709504 /  0.900%        5.745850 /  8.390%
+[MNNV2Basic.cpp:523]                                                477 ConvolutionDepthwise         10        0.640600 /  6.367%        3.612672 /  1.200%        3.063721 /  4.474%
+[MNNV2Basic.cpp:523]                                                495 ConvolutionDepthwise         10        0.730900 /  7.265%        4.064256 /  1.349%        3.450806 /  5.039%
+[MNNV2Basic.cpp:536] Avg= 10.060501 ms, OpSum = 9.959799 ms min= 7.413000 ms, max= 10.513000 ms
+
+
+
+➜ ✗ ../../build/MNNV2Basic.out resnet50-v2-7.mnn 10 0 0 4 0 1x3x224x224 
+
+[MNNV2Basic.cpp:518]                                             OpName               Optype   RunCount   AverageTime(ms)/Percent     Flops(MFlops)/Percent        Memory(MB)/Percent
+[MNNV2Basic.cpp:523]                      resnetv24_dense0_fwd_raster_0               Raster         10        0.003800 /  0.004%        0.000954 /  0.000%        0.007629 /  0.002%
+[MNNV2Basic.cpp:523]    resnetv24_dense0_fwd__matmul_converted_raster_0               Raster         10        0.004100 /  0.004%        0.001953 /  0.000%        0.015625 /  0.005%
+[MNNV2Basic.cpp:523]                       resnetv24_stage4_activation3                 ReLU         10        0.025200 /  0.025%        0.095703 /  0.002%        0.765625 /  0.227%
+[MNNV2Basic.cpp:523]                       resnetv24_stage4_activation6                 ReLU         10        0.025600 /  0.025%        0.095703 /  0.002%        0.765625 /  0.227%
+[MNNV2Basic.cpp:523]                                resnetv24_relu1_fwd                 ReLU         10        0.025800 /  0.025%        0.095703 /  0.002%        0.765625 /  0.227%
+[MNNV2Basic.cpp:523]                      resnetv24_stage3_activation12                 ReLU         10        0.052400 /  0.052%        0.191406 /  0.005%        1.531250 /  0.454%
+[MNNV2Basic.cpp:523]                       resnetv24_stage4_activation0                 ReLU         10        0.053200 /  0.052%        0.191406 /  0.005%        1.531250 /  0.454%
+[MNNV2Basic.cpp:523]                      resnetv24_stage3_activation15                 ReLU         10        0.055300 /  0.054%        0.191406 /  0.005%        1.531250 /  0.454%
+[MNNV2Basic.cpp:523]                       resnetv24_stage3_activation3                 ReLU         10        0.056700 /  0.056%        0.191406 /  0.005%        1.531250 /  0.454%
+[MNNV2Basic.cpp:523]                       resnetv24_stage3_activation9                 ReLU         10        0.062200 /  0.061%        0.191406 /  0.005%        1.531250 /  0.454%
+[MNNV2Basic.cpp:523]                       resnetv24_stage3_activation6                 ReLU         10        0.063900 /  0.063%        0.191406 /  0.005%        1.531250 /  0.454%
+[MNNV2Basic.cpp:523]                       resnetv24_stage1_activation0                 ReLU         10        0.069100 /  0.068%        0.191406 /  0.005%        1.531250 /  0.454%
+[MNNV2Basic.cpp:523]                           resnetv24_batchnorm2_fwd                Scale         10        0.082400 /  0.081%        0.095703 /  0.002%        0.765625 /  0.227%
+[MNNV2Basic.cpp:523]                            resnetv24_stage4__plus2             BinaryOp         10        0.083200 /  0.082%        0.095703 /  0.002%        1.148438 /  0.340%
+[MNNV2Basic.cpp:523]                       resnetv24_pool1_fwd_raster_0              Pooling         10        0.084300 /  0.083%        0.000000 /  0.000%        0.390625 /  0.116%
+[MNNV2Basic.cpp:523]                    resnetv24_stage4_batchnorm6_fwd                Scale         10        0.084600 /  0.083%        0.095703 /  0.002%        0.765625 /  0.227%
+[MNNV2Basic.cpp:523]                    resnetv24_stage4_batchnorm3_fwd                Scale         10        0.084800 /  0.083%        0.095703 /  0.002%        0.765625 /  0.227%
+[MNNV2Basic.cpp:523]                            resnetv24_stage4__plus1             BinaryOp         10        0.085000 /  0.084%        0.095703 /  0.002%        1.148438 /  0.340%
+[MNNV2Basic.cpp:523]                            resnetv24_stage4__plus0             BinaryOp         10        0.089300 /  0.088%        0.095703 /  0.002%        1.148438 /  0.340%
+[MNNV2Basic.cpp:523]                       resnetv24_stage2_activation3                 ReLU         10        0.118400 /  0.117%        0.382812 /  0.009%        3.062500 /  0.908%
+[MNNV2Basic.cpp:523]                  resnetv24_batchnorm0_fwd_raster_0               Raster         10        0.128900 /  0.127%        0.191406 /  0.005%        1.148438 /  0.340%
+[MNNV2Basic.cpp:523]                       resnetv24_stage3_activation0                 ReLU         10        0.129900 /  0.128%        0.382812 /  0.009%        3.062500 /  0.908%
+[MNNV2Basic.cpp:523]                       resnetv24_stage2_activation9                 ReLU         10        0.135400 /  0.133%        0.382812 /  0.009%        3.062500 /  0.908%
+[MNNV2Basic.cpp:523]                       resnetv24_stage2_activation6                 ReLU         10        0.135500 /  0.133%        0.382812 /  0.009%        3.062500 /  0.908%
+[MNNV2Basic.cpp:523]                         resnetv24_stage1_conv0_fwd          Convolution         10        0.143300 /  0.141%       12.845056 /  0.313%        1.547119 /  0.458%
+[MNNV2Basic.cpp:523]                   resnetv24_stage3_batchnorm15_fwd                Scale         10        0.165600 /  0.163%        0.191406 /  0.005%        1.531250 /  0.454%
+[MNNV2Basic.cpp:523]                    resnetv24_stage3_batchnorm9_fwd                Scale         10        0.166500 /  0.164%        0.191406 /  0.005%        1.531250 /  0.454%
+[MNNV2Basic.cpp:523]                    resnetv24_stage4_batchnorm0_fwd                Scale         10        0.166500 /  0.164%        0.191406 /  0.005%        1.531250 /  0.454%
+[MNNV2Basic.cpp:523]                            resnetv24_stage3__plus5             BinaryOp         10        0.169000 /  0.166%        0.191406 /  0.005%        2.296875 /  0.681%
+[MNNV2Basic.cpp:523]                   resnetv24_stage3_batchnorm12_fwd                Scale         10        0.169400 /  0.167%        0.191406 /  0.005%        1.531250 /  0.454%
+[MNNV2Basic.cpp:523]                    resnetv24_stage3_batchnorm3_fwd                Scale         10        0.170300 /  0.168%        0.191406 /  0.005%        1.531250 /  0.454%
+[MNNV2Basic.cpp:523]                            resnetv24_stage3__plus4             BinaryOp         10        0.172900 /  0.170%        0.191406 /  0.005%        2.296875 /  0.681%
+[MNNV2Basic.cpp:523]                            resnetv24_stage3__plus3             BinaryOp         10        0.176500 /  0.174%        0.191406 /  0.005%        2.296875 /  0.681%
+[MNNV2Basic.cpp:523]                    resnetv24_stage3_batchnorm6_fwd                Scale         10        0.177600 /  0.175%        0.191406 /  0.005%        1.531250 /  0.454%
+[MNNV2Basic.cpp:523]                            resnetv24_stage3__plus2             BinaryOp         10        0.177800 /  0.175%        0.191406 /  0.005%        2.296875 /  0.681%
+[MNNV2Basic.cpp:523]                            resnetv24_stage3__plus1             BinaryOp         10        0.180200 /  0.177%        0.191406 /  0.005%        2.296875 /  0.681%
+[MNNV2Basic.cpp:523]                            resnetv24_stage3__plus0             BinaryOp         10        0.182700 /  0.180%        0.191406 /  0.005%        2.296875 /  0.681%
+[MNNV2Basic.cpp:523]                    resnetv24_stage1_batchnorm0_fwd                Scale         10        0.185000 /  0.182%        0.191406 /  0.005%        1.531250 /  0.454%
+[MNNV2Basic.cpp:523]                       resnetv24_stage2_activation0                 ReLU         10        0.256400 /  0.252%        0.765625 /  0.019%        6.125000 /  1.815%
+[MNNV2Basic.cpp:523]                       resnetv24_stage1_activation3                 ReLU         10        0.268000 /  0.264%        0.765625 /  0.019%        6.125000 /  1.815%
+[MNNV2Basic.cpp:523]                       resnetv24_stage1_activation6                 ReLU         10        0.290600 /  0.286%        0.765625 /  0.019%        6.125000 /  1.815%
+[MNNV2Basic.cpp:523]             resnetv24_dense0_fwd__matmul_converted          Convolution         10        0.322000 /  0.317%        2.048000 /  0.050%        7.827942 /  2.320%
+[MNNV2Basic.cpp:523]                    resnetv24_stage3_batchnorm0_fwd                Scale         10        0.343300 /  0.338%        0.382812 /  0.009%        3.062500 /  0.908%
+[MNNV2Basic.cpp:523]                    resnetv24_stage2_batchnorm6_fwd                Scale         10        0.348400 /  0.343%        0.382812 /  0.009%        3.062500 /  0.908%
+[MNNV2Basic.cpp:523]                    resnetv24_stage2_batchnorm3_fwd                Scale         10        0.351100 /  0.346%        0.382812 /  0.009%        3.062500 /  0.908%
+[MNNV2Basic.cpp:523]                    resnetv24_stage2_batchnorm9_fwd                Scale         10        0.352200 /  0.347%        0.382812 /  0.009%        3.062500 /  0.908%
+[MNNV2Basic.cpp:523]                            resnetv24_stage2__plus0             BinaryOp         10        0.359100 /  0.354%        0.382812 /  0.009%        4.593750 /  1.361%
+[MNNV2Basic.cpp:523]                            resnetv24_stage2__plus1             BinaryOp         10        0.359100 /  0.354%        0.382812 /  0.009%        4.593750 /  1.361%
+[MNNV2Basic.cpp:523]                            resnetv24_stage2__plus3             BinaryOp         10        0.363300 /  0.358%        0.382812 /  0.009%        4.593750 /  1.361%
+[MNNV2Basic.cpp:523]                        resnetv24_stage3_conv15_fwd          Convolution         10        0.365600 /  0.360%       51.380222 /  1.251%        1.960938 /  0.581%
+[MNNV2Basic.cpp:523]                            resnetv24_stage2__plus2             BinaryOp         10        0.368500 /  0.363%        0.382812 /  0.009%        4.593750 /  1.361%
+[MNNV2Basic.cpp:523]                        resnetv24_stage3_conv18_fwd          Convolution         10        0.370300 /  0.365%       51.380222 /  1.251%        1.960938 /  0.581%
+[MNNV2Basic.cpp:523]                        resnetv24_stage3_conv12_fwd          Convolution         10        0.383200 /  0.377%       51.380222 /  1.251%        1.960938 /  0.581%
+[MNNV2Basic.cpp:523]                         resnetv24_stage3_conv2_fwd          Convolution         10        0.386900 /  0.381%       51.380222 /  1.251%        1.960938 /  0.581%
+[MNNV2Basic.cpp:523]                        resnetv24_stage2_conv12_fwd          Convolution         10        0.388200 /  0.382%       51.380222 /  1.251%        2.166016 /  0.642%
+[MNNV2Basic.cpp:523]                         resnetv24_stage3_conv9_fwd          Convolution         10        0.392100 /  0.386%       51.380222 /  1.251%        1.960938 /  0.581%
+[MNNV2Basic.cpp:523]                         resnetv24_stage1_conv9_fwd          Convolution         10        0.393600 /  0.388%       51.380222 /  1.251%        3.891602 /  1.153%
+[MNNV2Basic.cpp:523]                         resnetv24_stage3_conv6_fwd          Convolution         10        0.393900 /  0.388%       51.380222 /  1.251%        1.960938 /  0.581%
+[MNNV2Basic.cpp:523]                         resnetv24_stage4_conv2_fwd          Convolution         10        0.398600 /  0.392%       51.380222 /  1.251%        4.486328 /  1.329%
+[MNNV2Basic.cpp:523]                         resnetv24_stage4_conv6_fwd          Convolution         10        0.400300 /  0.394%       51.380222 /  1.251%        4.486328 /  1.329%
+[MNNV2Basic.cpp:523]                         resnetv24_stage2_conv6_fwd          Convolution         10        0.400300 /  0.394%       51.380222 /  1.251%        2.166016 /  0.642%
+[MNNV2Basic.cpp:523]                         resnetv24_stage2_conv2_fwd          Convolution         10        0.408100 /  0.402%       51.380222 /  1.251%        2.166016 /  0.642%
+[MNNV2Basic.cpp:523]                         resnetv24_stage2_conv9_fwd          Convolution         10        0.408200 /  0.402%       51.380222 /  1.251%        2.166016 /  0.642%
+[MNNV2Basic.cpp:523]                         resnetv24_stage4_conv9_fwd          Convolution         10        0.418300 /  0.412%       51.380222 /  1.251%        4.486328 /  1.329%
+[MNNV2Basic.cpp:523]                         resnetv24_stage1_conv6_fwd          Convolution         10        0.430100 /  0.424%       51.380222 /  1.251%        3.891602 /  1.153%
+[MNNV2Basic.cpp:523]                         resnetv24_stage1_conv2_fwd          Convolution         10        0.434000 /  0.427%       51.380222 /  1.251%        3.891602 /  1.153%
+[MNNV2Basic.cpp:523]                         resnetv24_stage1_conv3_fwd          Convolution         10        0.438500 /  0.432%       51.380222 /  1.251%        3.891602 /  1.153%
+[MNNV2Basic.cpp:523]                         resnetv24_stage2_conv4_fwd          Convolution         10        0.450100 /  0.443%       51.380222 /  1.251%        2.164551 /  0.641%
+[MNNV2Basic.cpp:523]                        resnetv24_stage2_conv10_fwd          Convolution         10        0.453800 /  0.447%       51.380222 /  1.251%        2.164551 /  0.641%
+[MNNV2Basic.cpp:523]                         resnetv24_stage4_conv7_fwd          Convolution         10        0.455100 /  0.448%       51.380222 /  1.251%        4.480469 /  1.328%
+[MNNV2Basic.cpp:523]                         resnetv24_stage2_conv7_fwd          Convolution         10        0.458300 /  0.451%       51.380222 /  1.251%        2.164551 /  0.641%
+[MNNV2Basic.cpp:523]                         resnetv24_stage4_conv4_fwd          Convolution         10        0.481100 /  0.474%       51.380222 /  1.251%        4.480469 /  1.328%
+[MNNV2Basic.cpp:523]                        resnetv24_stage3_conv16_fwd          Convolution         10        0.483800 /  0.476%       51.380222 /  1.251%        1.958008 /  0.580%
+[MNNV2Basic.cpp:523]                         resnetv24_stage3_conv7_fwd          Convolution         10        0.490100 /  0.483%       51.380222 /  1.251%        1.958008 /  0.580%
+[MNNV2Basic.cpp:523]                        resnetv24_stage3_conv10_fwd          Convolution         10        0.491400 /  0.484%       51.380222 /  1.251%        1.958008 /  0.580%
+[MNNV2Basic.cpp:523]                         resnetv24_stage3_conv4_fwd          Convolution         10        0.498700 /  0.491%       51.380222 /  1.251%        1.958008 /  0.580%
+[MNNV2Basic.cpp:523]                        resnetv24_stage3_conv13_fwd          Convolution         10        0.502000 /  0.494%       51.380222 /  1.251%        1.958008 /  0.580%
+[MNNV2Basic.cpp:523]                         resnetv24_stage1_conv7_fwd          Convolution         10        0.531000 /  0.523%       51.380222 /  1.251%        3.890869 /  1.153%
+[MNNV2Basic.cpp:523]                         resnetv24_stage1_conv4_fwd          Convolution         10        0.551100 /  0.543%       51.380222 /  1.251%        3.890869 /  1.153%
+[MNNV2Basic.cpp:523]                    resnetv24_stage2_batchnorm0_fwd                Scale         10        0.678900 /  0.668%        0.765625 /  0.019%        6.125000 /  1.815%
+[MNNV2Basic.cpp:523]                    resnetv24_stage1_batchnorm3_fwd                Scale         10        0.710000 /  0.699%        0.765625 /  0.019%        6.125000 /  1.815%
+[MNNV2Basic.cpp:523]                            resnetv24_stage1__plus2             BinaryOp         10        0.721400 /  0.710%        0.765625 /  0.019%        9.187500 /  2.723%
+[MNNV2Basic.cpp:523]                    resnetv24_stage1_batchnorm6_fwd                Scale         10        0.723700 /  0.713%        0.765625 /  0.019%        6.125000 /  1.815%
+[MNNV2Basic.cpp:523]                            resnetv24_stage1__plus0             BinaryOp         10        0.743400 /  0.732%        0.765625 /  0.019%        9.187500 /  2.723%
+[MNNV2Basic.cpp:523]                            resnetv24_stage1__plus1             BinaryOp         10        0.760400 /  0.749%        0.765625 /  0.019%        9.187500 /  2.723%
+[MNNV2Basic.cpp:523]                         resnetv24_stage3_conv0_fwd          Convolution         10        0.786000 /  0.774%      102.760445 /  2.502%        2.797852 /  0.829%
+[MNNV2Basic.cpp:523]                         resnetv24_stage2_conv0_fwd          Convolution         10        0.810000 /  0.798%      102.760445 /  2.502%        4.719238 /  1.398%
+[MNNV2Basic.cpp:523]                         resnetv24_stage4_conv0_fwd          Convolution         10        0.812900 /  0.800%      102.760445 /  2.502%        3.150391 /  0.934%
+[MNNV2Basic.cpp:523]                         resnetv24_stage2_conv3_fwd          Convolution         10        0.966800 /  0.952%      102.760445 /  2.502%        5.095703 /  1.510%
+[MNNV2Basic.cpp:523]                         resnetv24_stage4_conv3_fwd          Convolution         10        0.982700 /  0.968%      102.760445 /  2.502%        9.156250 /  2.713%
+[MNNV2Basic.cpp:523]                                resnetv24_pool0_fwd              Pooling         10        1.040800 /  1.025%        1.722656 /  0.042%        3.828125 /  1.134%
+[MNNV2Basic.cpp:523]                         resnetv24_stage3_conv3_fwd          Convolution         10        1.280400 /  1.261%      102.760445 /  2.502%        4.300781 /  1.274%
+[MNNV2Basic.cpp:523]                           resnetv24_batchnorm0_fwd                Scale         10        1.315700 /  1.296%        0.191406 /  0.005%        1.148438 /  0.340%
+[MNNV2Basic.cpp:523]                         resnetv24_stage2_conv1_fwd          Convolution         10        1.361300 /  1.340%      115.605507 /  2.815%        2.477051 /  0.734%
+[MNNV2Basic.cpp:523]                                resnetv24_conv0_fwd          Convolution         10        1.584100 /  1.560%      118.013954 /  2.873%        3.672852 /  1.088%
+[MNNV2Basic.cpp:523]                         resnetv24_stage4_conv1_fwd          Convolution         10        1.633000 /  1.608%      115.605507 /  2.815%        9.480469 /  2.809%
+[MNNV2Basic.cpp:523]                         resnetv24_stage3_conv1_fwd          Convolution         10        1.712700 /  1.686%      115.605507 /  2.815%        3.208008 /  0.951%
+[MNNV2Basic.cpp:523]                         resnetv24_stage1_conv8_fwd          Convolution         10        3.229100 /  3.180%      115.605507 /  2.815%        1.672119 /  0.496%
+[MNNV2Basic.cpp:523]                         resnetv24_stage1_conv5_fwd          Convolution         10        3.312400 /  3.262%      115.605507 /  2.815%        1.672119 /  0.496%
+[MNNV2Basic.cpp:523]                         resnetv24_stage1_conv1_fwd          Convolution         10        3.322400 /  3.271%      115.605507 /  2.815%        1.672119 /  0.496%
+[MNNV2Basic.cpp:523]                        resnetv24_stage3_conv17_fwd          Convolution         10        4.365800 /  4.299%      115.605507 /  2.815%        2.633789 /  0.780%
+[MNNV2Basic.cpp:523]                        resnetv24_stage3_conv14_fwd          Convolution         10        4.433600 /  4.366%      115.605507 /  2.815%        2.633789 /  0.780%
+[MNNV2Basic.cpp:523]                         resnetv24_stage3_conv8_fwd          Convolution         10        4.621900 /  4.551%      115.605507 /  2.815%        2.633789 /  0.780%
+[MNNV2Basic.cpp:523]                        resnetv24_stage3_conv11_fwd          Convolution         10        4.656199 /  4.585%      115.605507 /  2.815%        2.633789 /  0.780%
+[MNNV2Basic.cpp:523]                         resnetv24_stage3_conv5_fwd          Convolution         10        4.685100 /  4.613%      115.605507 /  2.815%        2.633789 /  0.780%
+[MNNV2Basic.cpp:523]                         resnetv24_stage2_conv8_fwd          Convolution         10        5.212000 /  5.132%      115.605507 /  2.815%        1.328613 /  0.394%
+[MNNV2Basic.cpp:523]                        resnetv24_stage2_conv11_fwd          Convolution         10        5.235301 /  5.155%      115.605507 /  2.815%        1.328613 /  0.394%
+[MNNV2Basic.cpp:523]                         resnetv24_stage2_conv5_fwd          Convolution         10        5.248000 /  5.168%      115.605507 /  2.815%        1.328613 /  0.394%
+[MNNV2Basic.cpp:523]                         resnetv24_stage4_conv8_fwd          Convolution         10        6.753700 /  6.650%      115.605507 /  2.815%        9.193359 /  2.724%
+[MNNV2Basic.cpp:523]                         resnetv24_stage4_conv5_fwd          Convolution         10        6.875700 /  6.770%      115.605507 /  2.815%        9.193359 /  2.724%
+[MNNV2Basic.cpp:536] Avg= 101.557602 ms, OpSum = 101.356400 ms min= 90.913002 ms, max= 124.038002 ms

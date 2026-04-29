@@ -86,6 +86,9 @@ public:
     /** Operator's flops, in M*/
     float flops() const;
 
+    /** Operator's theoretical memory access, in MB*/
+    float memoryTheoreticalMB() const;
+
 protected:
     OperatorInfo();
     ~OperatorInfo();
@@ -435,6 +438,9 @@ public:
         
         /** Mode / NumberThread, int* */
         THREAD_NUMBER = 4,
+
+        /** Theoretical memory access in session in MB, float* */
+        MEMORY_THEORETICAL = 5,
 
         ALL
     };

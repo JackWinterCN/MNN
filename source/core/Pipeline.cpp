@@ -115,6 +115,11 @@ const std::string& OperatorInfo::type() const {
 float OperatorInfo::flops() const {
     return mContent->flops;
 }
+
+float OperatorInfo::memoryTheoreticalMB() const {
+    return mContent->memoryTheoreticalMB;
+}
+
 static Backend::StorageType _getTensorStorageType(const Tensor* tensor, bool outputStatic) {
     auto des   = TensorUtils::getDescribe(tensor);
     auto usage = des->usage;
@@ -208,6 +213,7 @@ void Pipeline::UnitInfo::setUp(const Command& command, int index, const Op* orig
 #endif
 #ifndef MNN_SKIPBUILD_GEOMETRY
     mContent->flops = SizeComputer::computeFlops(command.op, command.inputs, command.outputs);
+    mContent->memoryTheoreticalMB = SizeComputer::computeMemoryTheoreticalMB(command.op, command.inputs, command.outputs);
 #endif
 }
 
@@ -461,6 +467,7 @@ ErrorCode Pipeline::encode(bool supportDebug, bool permitCodegen) {
     /** Prepare DebugInfo*/
     if (supportDebug) {
         mFlops = 0.0f;
+        mMemoryTheoreticalMB = 0.0f;
         int totalIndex = 0;
         for (auto& info : mInfo.second) {
             auto& buffer = info.executeBuffer;
@@ -470,6 +477,7 @@ ErrorCode Pipeline::encode(bool supportDebug, bool permitCodegen) {
                 cmd.info.reset(new UnitInfo);
                 static_cast<UnitInfo*>(cmd.info.get())->setUp(cmd, index++, info.op, totalIndex++);
                 mFlops += cmd.info->flops();
+                mMemoryTheoreticalMB += cmd.info->memoryTheoreticalMB();
             }
         }
     }

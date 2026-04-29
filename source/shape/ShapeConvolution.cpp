@@ -134,6 +134,57 @@ public:
         auto flops = (float)oSize * kw * kh * (ic * oc / (group == 0 ? 1 : group)) / FLOPS_M;
         return flops;
     }
+
+    virtual float onComputeMemoryTheoreticalMB(const MNN::Op* op, const std::vector<Tensor*>& inputs,
+                                               const std::vector<Tensor*>& outputs) const {
+        // kernel memory size
+        auto layer = loadCommon(op);
+        auto kw    = layer->kernelX();
+        auto kh    = layer->kernelY();
+        auto ic    = inputs[0]->channel();
+        auto oc    = outputs[0]->channel();
+        auto group = layer->group();
+        if (op->type() == OpType_QuantizedDepthwiseConv2D || op->type() == OpType_ConvolutionDepthwise) {
+            group = ic;
+        }
+        // Note: inputs[0]->size() will count the alignment memory
+        // input memory size
+        auto inputSize = (float)inputs[0]->batch() * inputs[0]->channel() *
+                         inputs[0]->height() * inputs[0]->width() *
+                         inputs[0]->getType().bytes() / MEMORY_MB;
+        // kernel memory size, use input type to calculate kernel size
+        auto kernelSize = (float)(ic * oc / (group == 0 ? 1 : group)) * kw *
+                          kh * inputs[0]->getType().bytes() / MEMORY_MB;
+        // bias memory size
+        float biasSize = (float)oc * sizeof(float) / MEMORY_MB;
+        // output memory size
+        auto outputSize = (float)outputs[0]->batch() * outputs[0]->channel() *
+                          outputs[0]->height() * outputs[0]->width() *
+                          outputs[0]->getType().bytes() / MEMORY_MB;
+        // MNN_PRINT("%30s, type: %s, InShape: %dx%dx%dx%d, OutShape: %dx%dx%dx%d, "
+        //           "InputSize: %f, KernelSize: %f, BiasSize: %f, OutputSize: %f, "
+        //           "ActivationSize: %f, ParamSize: %f\n",
+        //           op->name()->c_str(), EnumNameOpType(op->type()),
+        //           inputs[0]->batch(), inputs[0]->channel(), inputs[0]->height(), inputs[0]->width(),
+        //           outputs[0]->batch(), outputs[0]->channel(), outputs[0]->height(), outputs[0]->width(),
+        //           inputSize, kernelSize, biasSize, outputSize,
+        //           inputSize + outputSize, kernelSize + biasSize);
+
+        // used in onnx-tool
+        // 1. MOP = kernelSize + outputSize
+        //        = (Co * Ci / group * K^2 + Co * Wo * Ho) * typeSize
+        // return kernelSize + outputSize;
+
+        // 2. MOP = inputSize + kernelSize + biasSize + outputSize
+        //        = (Ci * Wi * Hi + Co * Ci / group * K^2  + Co + Co * Wo * Ho) * typeSize
+        return inputSize + kernelSize + biasSize + outputSize;
+
+        // 3. MOP=C_{out} * W * H * (K^{2} * C_{in} / group * 2 + 1)
+        // return (float)inputs[0]->width() * inputs[0]->height() *
+        //        inputs[0]->getType().bytes() * oc *
+        //        (kw * kh * ic / (group == 0 ? 1 : group) * 2 + 1) / 1024.0f /
+        //        1024.0f;
+    }
 };
 
 class Dilation2DSizeComputer : public ConvolutionSizeComputer {

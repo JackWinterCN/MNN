@@ -352,6 +352,14 @@ bool Session::getInfo(Interpreter::SessionInfoCode code, void* ptr) const {
             *dst = flo;
             return true;
         } break;
+        case Interpreter::MEMORY_THEORETICAL: {
+            auto res = (float*)ptr;
+            *res = 0.0f;
+            for (auto& iter : mPipelines) {
+                *res += iter->memoryTheoreticalMB();
+            }
+            return true;
+        } break;
         case Interpreter::RESIZE_STATUS: {
             auto dst = (int*)ptr;
             if (mNeedResize) {

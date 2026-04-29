@@ -70,14 +70,16 @@ int main(int argc, const char* argv[]) {
             trans.setScale((float)(width-1) / (size_w-1), (float)(height-1) / (size_h-1));
             MNN::CV::ImageProcess::Config config;
             config.filterType = MNN::CV::BILINEAR;
-            float mean[3]     = {103.94f, 116.78f, 123.68f};
-            float normals[3] = {0.017f, 0.017f, 0.017f};
+            float mean[3]     = {123.675, 116.28, 103.53};
+            float normals[3] = {1.0f/58.395f, 1.0f/57.12f, 1.0f/57.375f};
+            // float mean[3]     = {103.94f, 116.78f, 123.68f};
+            // float normals[3] = {0.017f, 0.017f, 0.017f};
             // float mean[3]     = {127.5f, 127.5f, 127.5f};
             // float normals[3] = {0.00785f, 0.00785f, 0.00785f};
             ::memcpy(config.mean, mean, sizeof(mean));
             ::memcpy(config.normal, normals, sizeof(normals));
             config.sourceFormat = MNN::CV::RGBA;
-            config.destFormat   = MNN::CV::BGR;
+            config.destFormat   = MNN::CV::RGB;
 
             std::shared_ptr<MNN::CV::ImageProcess> pretreat(MNN::CV::ImageProcess::create(config));
             pretreat->setMatrix(trans);
@@ -87,6 +89,7 @@ int main(int argc, const char* argv[]) {
             auto outputs = tempModule->onForward({input});
             auto output = MNN::Express::_Convert(outputs[0], MNN::Express::NHWC);
             output = MNN::Express::_Reshape(output, {0, -1});
+            output = MNN::Express::_Softmax(output, 1);
             int topK = 10;
             auto topKV = MNN::Express::_TopKV2(output, MNN::Express::_Scalar<int>(topK));
             auto value = topKV[0]->readMap<float>();
@@ -95,7 +98,7 @@ int main(int argc, const char* argv[]) {
             MNN_PRINT("origin size: %d, %d\n", width, height);
             MNN_PRINT("For Input: %s \n", argv[i+2]);
             for (int v=0; v<topK; ++v) {
-                MNN_PRINT("%d - %.3f, ", indice[v], value[v]);
+                MNN_PRINT("%d - %.3f\n", indice[v], value[v]);
             }
             MNN_PRINT("\n");
             return 0;

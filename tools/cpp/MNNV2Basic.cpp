@@ -306,9 +306,13 @@ static int test_main(int argc, const char* argv[]) {
     net->getSessionInfo(session, MNN::Interpreter::MEMORY, &memoryUsage);
     float flops = 0.0f;
     net->getSessionInfo(session, MNN::Interpreter::FLOPS, &flops);
+    float memoryTheoretical = 0.0f;
+    net->getSessionInfo(session, MNN::Interpreter::MEMORY_THEORETICAL, &memoryTheoretical);
     int backendType[2];
     net->getSessionInfo(session, MNN::Interpreter::BACKENDS, backendType);
-    MNN_PRINT("Session Info: memory use %f MB, flops is %f M, backendType is %d\n", memoryUsage, flops, backendType[0]);
+    MNN_PRINT("Session Info: memory use %f MB, flops is %f M, theoretical "
+              "memory %f MB, backendType is %d\n",
+              memoryUsage, flops, memoryTheoretical, backendType[0]);
     // Set Other Inputs to Zero
     auto allInput = net->getSessionInputAll(session);
     for (auto& iter : allInput) {
@@ -435,6 +439,7 @@ static int test_main(int argc, const char* argv[]) {
         int t = runTime;
         MNN_PRINT("precision:%d, memory: %d, Run %d time:\n", precision, memory, t);
         std::map<std::string, std::pair<float, float>> opTimes;
+        std::map<std::string, float> opMemeoryTheoreticalMB;
         std::map<std::string, std::string> opTypes;
         uint64_t opBegin = 0;
 
@@ -446,6 +451,7 @@ static int test_main(int argc, const char* argv[]) {
             opBegin = getTimeInUs();
             if (opTimes.find(info->name()) == opTimes.end()) {
                 opTimes.insert(std::make_pair(info->name(), std::make_pair(0.0f, info->flops())));
+                opMemeoryTheoreticalMB.insert(std::make_pair(info->name(), info->memoryTheoreticalMB()));
             }
             return true;
         };
@@ -498,23 +504,33 @@ static int test_main(int argc, const char* argv[]) {
             }
             std::vector<std::pair<float, std::pair<std::string, float>>> allOpsTimes;
             float sumFlops = 0.0f;
+            float sumMemoryTheoretical = 0.0f;
             for (auto& iter : opTimes) {
                 allOpsTimes.push_back(
                     std::make_pair(iter.second.first, std::make_pair(iter.first, iter.second.second)));
                 sumFlops += iter.second.second;
+                assert(opMemeoryTheoreticalMB.find(iter.first) != opMemeoryTheoreticalMB.end());
+                sumMemoryTheoretical += opMemeoryTheoreticalMB[iter.first];
             }
 
             std::sort(allOpsTimes.begin(), allOpsTimes.end());
             float opSum = 0;
+            MNN_PRINT("%50s %20s %10s %25s %25s %25s\n", "OpName", "Optype",
+                      "RunCount", "AverageTime(ms)/Percent",
+                      "Flops(MFlops)/Percent", "Memory(MB)/Percent");
             for (auto& iter : allOpsTimes) {
                 opSum += iter.first;
-                MNN_PRINT("%*s \t[%s] run %d average cost %f ms, %.3f %%, FlopsRate: %.3f %%\n", 50,
+                MNN_PRINT("%50s %20s %10d %15.6f /%7.3f%% %15.6f /%7.3f%% %15.6f /%7.3f%%\n",
                     iter.second.first.c_str(),
                     opTypes[iter.second.first].c_str(),
                     runTime,
                     iter.first / (float)runTime,
                     iter.first / sum * 100.0f,
-                    iter.second.second / sumFlops * 100.0f);
+                    iter.second.second,
+                    iter.second.second / sumFlops * 100.0f,
+                    opMemeoryTheoreticalMB[iter.second.first],
+                    opMemeoryTheoreticalMB[iter.second.first] / sumMemoryTheoretical * 100.0f
+                );
             }
             opSum = opSum / runTime;
             MNN_PRINT("Avg= %f ms, OpSum = %f ms min= %f ms, max= %f ms\n", sum / (float)t, opSum, minTime, maxTime);

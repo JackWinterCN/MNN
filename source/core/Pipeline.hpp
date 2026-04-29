@@ -18,6 +18,7 @@ struct OperatorInfo::Info {
     std::string name;
     std::string type;
     float flops = 0.0f;
+    float memoryTheoreticalMB = 0.0f;
 };
 class SizeComputer;
 /** pipeline. one session may contains multiple pipeline, and one pipeline may contains more than one unit. */
@@ -58,6 +59,10 @@ public:
     float flops() const {
         return mFlops;
     }
+
+    float memoryTheoreticalMB() const {
+        return mMemoryTheoreticalMB;
+    }
     friend class Session;
     MNNForwardType getMainForwardType() const  {
         return mInfo.first.cache.first->type();
@@ -75,6 +80,7 @@ private:
     bool mOutputStatic;
     TuningAttr mTuneAttr;
     float mFlops = 0.0f;
+    float mMemoryTheoreticalMB = 0.0f;
     bool mIsQuantModel = false;
 
     // For gpu or other backend

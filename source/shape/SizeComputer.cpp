@@ -81,6 +81,53 @@ float SizeComputer::computeFlops(const MNN::Op* op, const std::vector<Tensor*>& 
     }
     return sumFlops;
 }
+
+float SizeComputer::onComputeMemoryTheoreticalMB(const MNN::Op* op, const std::vector<Tensor*>& inputs,
+                                                 const std::vector<Tensor*>& outputs) const {
+    // MNN_PRINT("use default theoretical memory computer for: %s\n", MNN::EnumNameOpType(op->type()));
+    float memoryAccess = 0.0f;
+    // inputs memory size
+    for (auto input : inputs) {
+        memoryAccess += (float)input->batch() * input->channel() *
+                        input->height() * input->width() *
+                        input->getType().bytes() / MEMORY_MB;
+    }
+    // calculate outputs memory size
+    for (auto output : outputs) {
+        memoryAccess += (float)output->batch() * output->channel() *
+                        output->height() * output->width() *
+                        output->getType().bytes() / MEMORY_MB;
+    }
+    return memoryAccess;
+}
+
+float SizeComputer::computeMemoryTheoreticalMB(const MNN::Op* op, const std::vector<Tensor*>& inputs,
+                                               const std::vector<Tensor*>& outputs) {
+    auto computeFactory = SizeComputerSuite::get();
+    auto computer       = computeFactory->search(op->type());
+    if (nullptr != computer) {
+        return computer->onComputeMemoryTheoreticalMB(op, inputs, outputs);
+    }
+    if (op->type() == OpType_While && op->main_type() == OpParameter_LoopParam) {
+        // for loop, return 0
+        return 0.0f;
+    }
+    float sumMemoryAccess = 0.0f;
+    // inputs memory size
+    for (auto input : inputs) {
+        sumMemoryAccess += (float)input->batch() * input->channel() *
+                           input->height() * input->width() *
+                           input->getType().bytes() / MEMORY_MB;
+    }
+    // calculate outputs memory size
+    for (auto output : outputs) {
+        sumMemoryAccess += (float)output->batch() * output->channel() *
+                           output->height() * output->width() *
+                           output->getType().bytes() / MEMORY_MB;
+    }
+    return sumMemoryAccess;
+}
+
 #ifdef MNN_DEBUG_TENSOR_SIZE
 static void _printShape(const MNN::Op* op, const std::vector<Tensor*>& inputs,
                         const std::vector<Tensor*>& outputs) {
